@@ -261,10 +261,11 @@
       border: none;
       color: rgba(255, 255, 255, 0.4);
       cursor: pointer;
-      padding: 0 4px;
-      line-height: 1;
-      font-size: 14px;
+      padding: 4px;
+      line-height: 0;
       border-radius: 4px;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
     }
 
     .tag-option:hover .delete-tag-btn {
@@ -280,6 +281,7 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
+      flex-shrink: 0;
     }
 
     .tag-create-prompt {
@@ -522,11 +524,13 @@
           const option = document.createElement('div');
           option.className = 'tag-option';
           option.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
-              ${tag.title}
-            </div>
-            <button class="delete-tag-btn">&times;</button>
+            <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
+            <span style="flex: 1; word-break: break-word;">${tag.title}</span>
+            <button class="delete-tag-btn" title="Delete Label">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.5 3.5H11.5M4.5 3.5V2.5C4.5 1.94772 4.94772 1.5 5.5 1.5H8.5C9.05228 1.5 9.5 1.94772 9.5 2.5V3.5M5.5 6.5V10.5M8.5 6.5V10.5M3.5 3.5V11.5C3.5 12.0523 3.94772 12.5 4.5 12.5H9.5C10.0523 12.5 10.5 12.0523 10.5 11.5V3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           `;
           option.onclick = () => selectTag(itemId, tag);
 
