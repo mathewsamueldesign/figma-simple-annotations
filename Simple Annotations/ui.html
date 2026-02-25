@@ -254,6 +254,28 @@
       background-color: #3A3A3C;
     }
 
+    .tag-option .delete-tag-btn {
+      display: none;
+      margin-left: auto;
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      font-size: 14px;
+      border-radius: 4px;
+    }
+
+    .tag-option:hover .delete-tag-btn {
+      display: block;
+    }
+
+    .tag-option .delete-tag-btn:hover {
+      color: #FF453A;
+      background: rgba(255, 69, 58, 0.2);
+    }
+
     .tag-color-dot {
       width: 10px;
       height: 10px;
@@ -500,10 +522,25 @@
           const option = document.createElement('div');
           option.className = 'tag-option';
           option.innerHTML = `
-            <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
-            ${tag.title}
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
+              ${tag.title}
+            </div>
+            <button class="delete-tag-btn">&times;</button>
           `;
           option.onclick = () => selectTag(itemId, tag);
+
+          const deleteBtn = option.querySelector('.delete-tag-btn');
+          deleteBtn.onclick = (e) => {
+            e.stopPropagation(); // Don't select the tag!
+            deleteTag(tag.title);
+            // Re-run the filter to instantly update the UI (it will slide into Doc tags)
+            const currentInput = document.querySelector(`#tag-dropdown-${itemId}`).previousElementSibling;
+            if (currentInput) {
+              filterTags(itemId, currentInput.value);
+            }
+          };
+
           dropdown.appendChild(option);
         });
       }
@@ -545,6 +582,19 @@
       } else {
         dropdown.classList.remove('visible');
       }
+    };
+
+    window.deleteTag = (title) => {
+      // Remove from memory
+      state.clientTags = state.clientTags.filter(t => t.title.toLowerCase() !== title.toLowerCase());
+
+      // Save directly to backend
+      parent.postMessage({
+        pluginMessage: {
+          type: 'save-tags',
+          data: state.clientTags
+        }
+      }, '*');
     };
 
     window.closeTagDropdown = (itemId) => {
