@@ -370,7 +370,7 @@
         container.appendChild(card);
         renderColorSwatches(document.getElementById(`colors-${item.id}`), item.color, (newColor) => {
           updateItem(item.id, 'color', newColor);
-          renderItems(); // Re-render to update swatch selection
+          updateItemsWithoutLosingFocus(state.items); // Smart re-render!
         });
       });
     }
@@ -439,8 +439,8 @@
     };
 
     function saveAnnotation() {
-      const validItems = state.items.filter(i => i.title.trim() || i.desc.trim());
-      if (validItems.length === 0 && state.mode !== 'edit') {
+      const hasContent = state.items.some(i => i.title.trim() || i.desc.trim());
+      if (!hasContent && state.mode !== 'edit') {
         parent.postMessage({ pluginMessage: { type: 'notify', message: 'Please enter at least one annotation.' } }, '*');
         return;
       }
@@ -449,7 +449,7 @@
         theme: state.theme,
         matchStroke: state.matchStroke,
         connectorColor: state.connectorColor,
-        items: validItems
+        items: state.items // Sync all items, including empty, to maintain index harmony
       };
 
       parent.postMessage({
@@ -458,6 +458,52 @@
           data: payload
         }
       }, '*');
+    }
+
+    function updateItemsWithoutLosingFocus(newItems) {
+      const container = document.getElementById('items-container');
+      const currentIds = state.items.map(i => i.id).join(',');
+      const newIds = newItems.map(i => i.id).join(',');
+
+      if (currentIds !== newIds || state.items.length !== newItems.length) {
+        state.items = newItems;
+        renderItems();
+        return;
+      }
+
+      state.items = newItems;
+
+      state.items.forEach((item, index) => {
+        const card = container.children[index];
+        if (card) {
+          const titleInput = card.querySelector('input[type="text"]');
+          const descInput = card.querySelector('textarea');
+
+          if (titleInput && document.activeElement !== titleInput && titleInput.value !== item.title) {
+            titleInput.value = item.title;
+          }
+          if (descInput && document.activeElement !== descInput && descInput.value !== item.desc) {
+            descInput.value = item.desc;
+          }
+
+          // Color swatches
+          const colorsContainer = card.querySelector('.colors');
+          if (colorsContainer) {
+            const activeSwatch = colorsContainer.querySelector('.color-swatch.selected');
+            if (!activeSwatch || activeSwatch.style.backgroundColor !== hexToRgbStr(item.color)) {
+              renderColorSwatches(colorsContainer, item.color, (newColor) => {
+                updateItem(item.id, 'color', newColor);
+                updateItemsWithoutLosingFocus(state.items);
+              });
+            }
+          }
+        }
+      });
+    }
+
+    function hexToRgbStr(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : 'rgb(0, 0, 0)';
     }
 
     // Listen for state updates from Figma
@@ -469,16 +515,18 @@
           state.theme = msg.data.theme || 'dark';
           state.matchStroke = !!msg.data.matchStroke;
           state.connectorColor = msg.data.connectorColor || '#F24822';
-          state.items = msg.data.items && msg.data.items.length > 0 ? msg.data.items : [{ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }];
+
+          const newItems = msg.data.items && msg.data.items.length > 0 ? msg.data.items : [{ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }];
+          updateItemsWithoutLosingFocus(newItems);
         } else {
           // Reset for create mode
           state.theme = 'dark';
           state.matchStroke = false;
           state.connectorColor = '#F24822';
           state.items = [{ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }];
+          renderItems();
         }
         renderGlobal();
-        renderItems();
       }
     };
 

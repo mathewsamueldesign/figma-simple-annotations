@@ -105,16 +105,24 @@ figma.on('selectionchange', () => {
               if (dataStr) {
                 try {
                   const data = JSON.parse(dataStr) as AnnotationData;
-                  // All Item Rows are children of Annotation Note, offset by possible lines/dots if grouped differently,
-                  // but we can just filter by 'Item Row' to find the index.
-                  const rowChildren = annotationFrame.children.filter(c => c.name === 'Item Row');
-                  const itemIndex = rowChildren.findIndex(r => r.id === itemRow!.id);
 
-                  if (itemIndex > -1 && data.items[itemIndex]) {
+                  const itemId = itemRow.getPluginData('itemId');
+                  let targetItem = data.items.find(i => i.id === itemId);
+
+                  // Fallback for legacy annotations
+                  if (!targetItem) {
+                    const rowChildren = annotationFrame.children.filter(c => c.name === 'Item Row');
+                    const itemIndex = rowChildren.findIndex(r => r.id === itemRow!.id);
+                    if (itemIndex > -1 && data.items[itemIndex]) {
+                      targetItem = data.items[itemIndex];
+                    }
+                  }
+
+                  if (targetItem) {
                     if (textNode.name === 'Title') {
-                      data.items[itemIndex].title = textNode.characters;
+                      targetItem.title = textNode.characters;
                     } else if (textNode.name === 'Description') {
-                      data.items[itemIndex].desc = textNode.characters;
+                      targetItem.desc = textNode.characters;
                     }
 
                     // Save and re-sync
@@ -378,8 +386,11 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   parentFrame.resize(300, parentFrame.height);
 
   for (const item of data.items) {
+    if (!item.title?.trim() && !item.desc?.trim()) continue;
+
     const itemRow = figma.createFrame();
     itemRow.name = "Item Row";
+    itemRow.setPluginData('itemId', item.id);
     itemRow.layoutMode = "VERTICAL";
     itemRow.itemSpacing = 8;
     itemRow.fills = [];
