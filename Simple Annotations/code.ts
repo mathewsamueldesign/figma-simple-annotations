@@ -69,8 +69,7 @@ async function getTagsData() {
   return { clientTags, documentTags };
 }
 
-// Check selection and update UI state
-figma.on('selectionchange', async () => {
+async function emitState() {
   const selection = figma.currentPage.selection;
   const { clientTags, documentTags } = await getTagsData();
 
@@ -99,7 +98,13 @@ figma.on('selectionchange', async () => {
 
   // If no single annotation is selected, default to create mode
   figma.ui.postMessage({ type: 'set-state', mode: 'create', clientTags, documentTags });
-});
+}
+
+// Check selection and update UI state
+figma.on('selectionchange', emitState);
+
+// Trigger initial state on plugin launch
+emitState();
 
 // Auto-update connectors when moving things
 // Figma requires loadAllPagesAsync before registering documentchange

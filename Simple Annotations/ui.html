@@ -271,7 +271,7 @@
       align-items: center;
     }
 
-    .input-wrapper input[type="text"] {
+    .input-wrapper.has-tags input[type="text"] {
       padding-right: 32px;
     }
 
@@ -442,19 +442,22 @@
         const card = document.createElement('div');
         card.className = 'item-card';
 
+        const hasTags = (state.clientTags && state.clientTags.length > 0) || (state.documentTags && state.documentTags.length > 0);
+
         card.innerHTML = `
           <div class="item-header">
             <span style="font-size: 12px; color: #888;">Note ${index + 1}</span>
             ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
           </div>
-          <div class="input-wrapper">
+          <div class="input-wrapper ${hasTags ? 'has-tags' : ''}">
             <input type="text" placeholder="Short Label (e.g. BID)" value="${item.title}" 
                    oninput="updateItem('${item.id}', 'title', this.value); filterTags('${item.id}', this.value)"
                    onfocus="filterTags('${item.id}', this.value)"
                    onblur="setTimeout(() => closeTagDropdown('${item.id}'), 200)" />
+            ${hasTags ? `
             <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            </svg>` : ''}
             <div id="tag-dropdown-${item.id}" class="tag-dropdown"></div>
           </div>
           <div class="colors" id="colors-${item.id}"></div>
