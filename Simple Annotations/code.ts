@@ -1,4 +1,4 @@
-figma.showUI(__html__, { width: 340, height: 480 });
+figma.showUI(__html__, { width: 280, height: 420 });
 
 function hexToRgb(hex: string): RGB {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -17,13 +17,27 @@ interface AnnotationItem {
 }
 
 interface AnnotationData {
+  theme?: string;
+  matchStroke?: boolean;
   connectorColor: string;
   items: AnnotationItem[];
   targetNodeId?: string;
 }
 
-const FONT_REGULAR = { family: "Inter", style: "Regular" };
-const FONT_BOLD = { family: "Inter", style: "Bold" };
+const FONT_REGULAR: FontName = { family: "Inter", style: "Regular" };
+const FONT_BOLD: FontName = { family: "Inter", style: "Bold" };
+
+function getTopLevelFrame(node: BaseNode): BaseNode {
+  let topParent: BaseNode = node;
+  let currentParent: BaseNode | null = node;
+  while (currentParent && currentParent.type !== 'PAGE') {
+    if (currentParent.type === 'FRAME' || currentParent.type === 'COMPONENT' || currentParent.type === 'COMPONENT_SET') {
+      topParent = currentParent;
+    }
+    currentParent = currentParent.parent;
+  }
+  return topParent;
+}
 
 // Check selection and update UI state
 figma.on('selectionchange', () => {
@@ -174,30 +188,39 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     let startX = 0, startY = 0, endX = 0, endY = 0;
     let isHorizontal = Math.abs(tCenterX - fCenterX) > Math.abs(tCenterY - fCenterY);
 
+    const SNAP_THRESHOLD = 16;
+    let isSnapped = false;
+
     if (isHorizontal) {
+      isSnapped = Math.abs(tCenterY - fCenterY) < SNAP_THRESHOLD;
+      const finalY = isSnapped ? tCenterY : fCenterY;
+
       if (fCenterX > tCenterX) {
         // Frame is to the right
         startX = frameBounds.x;
-        startY = fCenterY;
+        startY = finalY;
         endX = targetBounds.x + targetBounds.width;
         endY = tCenterY;
       } else {
         // Frame is to the left
         startX = frameBounds.x + frameBounds.width;
-        startY = fCenterY;
+        startY = finalY;
         endX = targetBounds.x;
         endY = tCenterY;
       }
     } else {
+      isSnapped = Math.abs(tCenterX - fCenterX) < SNAP_THRESHOLD;
+      const finalX = isSnapped ? tCenterX : fCenterX;
+
       if (fCenterY > tCenterY) {
         // Frame is below
-        startX = fCenterX;
+        startX = finalX;
         startY = frameBounds.y;
         endX = tCenterX;
         endY = targetBounds.y + targetBounds.height;
       } else {
         // Frame is above
-        startX = fCenterX;
+        startX = finalX;
         startY = frameBounds.y + frameBounds.height;
         endX = tCenterX;
         endY = targetBounds.y;
@@ -218,16 +241,15 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     const pEndY = lEndY - minY;
 
     // We want the 'bus' elbows to run completely outside the parent container (e.g. the main artboard)
-    let topParent: BaseNode = targetNode;
-    while (topParent.parent && topParent.parent.type !== 'PAGE') {
-      topParent = topParent.parent;
-    }
+    let topParent = getTopLevelFrame(targetNode);
     const parentBounds = 'absoluteBoundingBox' in topParent ? topParent.absoluteBoundingBox : null;
 
     const allFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
 
     let pathData;
-    if (isHorizontal) {
+    if (isSnapped) {
+      pathData = `M ${pStartX} ${pStartY} L ${pEndX} ${pEndY}`;
+    } else if (isHorizontal) {
       allFrames.sort((a, b) => a.y - b.y);
       const frameIndex = allFrames.findIndex(f => f.id === frame.id);
 
@@ -287,6 +309,7 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     if (line.y !== minY) line.y = minY;
     line.strokeWeight = 2;
     line.dashPattern = [4, 4];
+    line.cornerRadius = 8;
     line.strokes = [{ type: 'SOLID', color: hexToRgb(data.connectorColor) }];
     line.fills = [];
 
@@ -319,13 +342,19 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
 }
 
 async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationData) {
-  // Clear existing children (for edit mode)
-  parentFrame.children.forEach(c => c.remove());
+  // Clear existing children (for edit mode) except for the connector line and dot
+  parentFrame.children.forEach(c => {
+    if (c.name !== '↳ Connector Line' && c.name !== 'Connector End') {
+      c.remove();
+    }
+  });
 
   await figma.loadFontAsync(FONT_REGULAR);
   await figma.loadFontAsync(FONT_BOLD);
 
   // Group container styling 
+  const isLight = data.theme === 'light';
+
   parentFrame.clipsContent = false;
   parentFrame.layoutMode = "VERTICAL";
   parentFrame.paddingTop = 16;
@@ -333,9 +362,15 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   parentFrame.paddingLeft = 16;
   parentFrame.paddingRight = 16;
   parentFrame.itemSpacing = 16;
-  parentFrame.cornerRadius = 8;
-  parentFrame.fills = [{ type: 'SOLID', color: hexToRgb('#2A2A2A') }];
-  parentFrame.strokes = [{ type: 'SOLID', color: hexToRgb('#444444') }];
+  parentFrame.cornerRadius = 16;
+  parentFrame.fills = [{ type: 'SOLID', color: hexToRgb(isLight ? '#FFFFFF' : '#1C1C1E') }];
+
+  if (data.matchStroke) {
+    parentFrame.strokes = [{ type: 'SOLID', color: hexToRgb(data.connectorColor) }];
+  } else {
+    parentFrame.strokes = [{ type: 'SOLID', color: hexToRgb(isLight ? '#E5E5E5' : '#333333') }];
+  }
+
   parentFrame.strokeWeight = 1;
   parentFrame.primaryAxisSizingMode = "AUTO";
   parentFrame.counterAxisSizingMode = "FIXED";
@@ -359,9 +394,9 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
       badge.layoutAlign = "MIN";
       badge.paddingTop = 4;
       badge.paddingBottom = 4;
-      badge.paddingLeft = 8;
-      badge.paddingRight = 8;
-      badge.cornerRadius = 4;
+      badge.paddingLeft = 12;
+      badge.paddingRight = 12;
+      badge.cornerRadius = 100;
       badge.fills = [{ type: 'SOLID', color: hexToRgb(item.color) }];
 
       const isLightColor = item.color === '#FFCD29';
@@ -370,7 +405,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
       titleText.name = "Title";
       titleText.characters = item.title;
       titleText.fontName = FONT_BOLD;
-      titleText.fontSize = 12;
+      titleText.fontSize = 13;
       titleText.fills = [{ type: 'SOLID', color: isLightColor ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 } }];
 
       badge.appendChild(titleText);
@@ -384,9 +419,9 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
       descText.name = "Description";
       descText.characters = item.desc;
       descText.fontName = FONT_REGULAR;
-      descText.fontSize = 13;
-      descText.lineHeight = { value: 20, unit: 'PIXELS' };
-      descText.fills = [{ type: 'SOLID', color: hexToRgb('#E6E6E6') }];
+      descText.fontSize = 14;
+      descText.lineHeight = { value: 22, unit: 'PIXELS' };
+      descText.fills = [{ type: 'SOLID', color: hexToRgb(isLight ? '#444444' : '#E0E0E0') }];
       descText.layoutAlign = "STRETCH";
       descText.textAutoResize = "HEIGHT";
       itemRow.appendChild(descText);
@@ -399,6 +434,11 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
 figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?: string }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
+    return;
+  }
+
+  if (msg.type === 'close-plugin') {
+    figma.closePlugin();
     return;
   }
 
@@ -420,11 +460,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?
     frame.setPluginData('annotationData', JSON.stringify(payload));
 
     // Positioning Logic
-    let topParent: BaseNode = targetNode;
-    while (topParent.parent && topParent.parent.type !== 'PAGE') {
-      topParent = topParent.parent;
-    }
-
+    let topParent = getTopLevelFrame(targetNode);
     const targetBounds = targetNode.absoluteBoundingBox;
     const parentBounds = 'absoluteBoundingBox' in topParent ? topParent.absoluteBoundingBox : null;
 
@@ -434,13 +470,13 @@ figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?
     if (targetBounds && parentBounds) {
       targetX = parentBounds.x + parentBounds.width + 120;
       targetY = targetBounds.y;
+    } else if (targetBounds) {
+      targetX = targetBounds.x + 120;
+      targetY = targetBounds.y;
     } else {
       targetX = targetNode.x + 120;
       targetY = targetNode.y;
     }
-
-    frame.x = targetX;
-    frame.y = targetY;
 
     // Collision detection: Shift down if overlapping with existing annotations
     const existingAnnotations = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } }).filter(n => n.id !== frame.id);
@@ -450,7 +486,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?
       for (const existing of existingAnnotations) {
         if ('absoluteBoundingBox' in existing && existing.absoluteBoundingBox) {
           const ez = existing.absoluteBoundingBox;
-          const fz = { x: frame.x, y: frame.y, width: frame.width, height: frame.height };
+          const fz = { x: targetX, y: targetY, width: frame.width, height: frame.height };
 
           if (
             fz.x < ez.x + ez.width + 20 &&
@@ -459,14 +495,24 @@ figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?
             fz.y + fz.height + 20 > ez.y
           ) {
             isOverlapping = true;
-            frame.y += ez.height + 24; // Shift down by the height of the colliding annotation plus gap
+            targetY += ez.height + 24; // Shift down by the height of the colliding annotation plus gap
             break;
           }
         }
       }
     }
 
-    figma.currentPage.appendChild(frame);
+    const sectionParent = topParent.parent?.type === 'SECTION' ? topParent.parent : null;
+    if (sectionParent) {
+      (sectionParent as SectionNode).appendChild(frame);
+      const sBounds = ('absoluteBoundingBox' in sectionParent && sectionParent.absoluteBoundingBox) ? sectionParent.absoluteBoundingBox : { x: 0, y: 0 };
+      frame.x = targetX - sBounds.x;
+      frame.y = targetY - sBounds.y;
+    } else {
+      figma.currentPage.appendChild(frame);
+      frame.x = targetX;
+      frame.y = targetY;
+    }
     updateConnector(frame, payload);
 
     figma.currentPage.selection = [frame];
