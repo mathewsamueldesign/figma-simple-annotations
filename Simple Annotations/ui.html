@@ -1,17 +1,301 @@
-<h2>Rectangle Creator</h2>
-<p>Count: <input id="count" type="number" value="5"></p>
-<button id="create">Create</button>
-<button id="cancel">Cancel</button>
-<script>
+<!DOCTYPE html>
+<html>
 
-document.getElementById('create').onclick = () => {
-  const textbox = document.getElementById('count');
-  const count = parseInt(textbox.value, 10);
-  parent.postMessage({ pluginMessage: { type: 'create-shapes', count } }, '*')
-}
+<head>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background-color: #222;
+      color: #fff;
+    }
 
-document.getElementById('cancel').onclick = () => {
-  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
-}
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #444;
+    }
 
-</script>
+    .section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #bbb;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 8px;
+      background-color: #333;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: white;
+      font-family: inherit;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: none;
+      height: 60px;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #18A0FB;
+    }
+
+    .colors {
+      display: flex;
+      gap: 8px;
+    }
+
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .color-swatch.selected {
+      border-color: #fff;
+      box-shadow: 0 0 0 1px #18A0FB;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      padding: 10px 16px;
+      cursor: pointer;
+      box-sizing: border-box;
+      transition: background-color 0.2s;
+    }
+
+    button.primary {
+      background-color: #18A0FB;
+      color: white;
+      border: none;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    button.primary:hover {
+      background-color: #0D8DE6;
+    }
+
+    button.secondary {
+      background-color: transparent;
+      color: #bbb;
+      border: 1px solid #555;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    button.secondary:hover {
+      background-color: #333;
+      color: white;
+    }
+
+    .item-card {
+      background-color: #2A2A2A;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .remove-btn {
+      background: none;
+      border: none;
+      color: #ff4d4f;
+      cursor: pointer;
+      padding: 4px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .remove-btn:hover {
+      background: none;
+      color: #ff7875;
+    }
+
+    #items-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="section">
+    <label>Connector Color</label>
+    <div class="colors" id="connector-colors">
+      <!-- Pallete definition -->
+    </div>
+  </div>
+
+  <div class="section">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <label>Annotations</label>
+      <button class="secondary" id="add-item">+ Add Note</button>
+    </div>
+    <div id="items-container"></div>
+  </div>
+
+  <button class="primary" id="save-btn">Create Annotation</button>
+
+  <script>
+    const COLORS = [
+      '#F24822', // Red
+      '#FFA629', // Orange
+      '#FFCD29', // Yellow
+      '#14AE5C', // Green
+      '#18A0FB', // Blue
+      '#9747FF', // Purple
+      '#F248A8'  // Pink
+    ];
+
+    let state = {
+      mode: 'create', // 'create' or 'edit'
+      connectorColor: '#F24822',
+      items: [
+        { id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }
+      ]
+    };
+
+    function renderColorSwatches(containerEl, selectedColor, onSelect) {
+      containerEl.innerHTML = '';
+      COLORS.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = `color-swatch ${color === selectedColor ? 'selected' : ''}`;
+        swatch.style.backgroundColor = color;
+        swatch.onclick = () => onSelect(color);
+        containerEl.appendChild(swatch);
+      });
+    }
+
+    function renderItems() {
+      const container = document.getElementById('items-container');
+      container.innerHTML = '';
+
+      state.items.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'item-card';
+
+        card.innerHTML = `
+          <div class="item-header">
+            <span style="font-size: 12px; color: #888;">Note ${index + 1}</span>
+            ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
+          </div>
+          <input type="text" placeholder="Short Label (e.g. BID)" value="${item.title}" oninput="updateItem('${item.id}', 'title', this.value)" />
+          <div class="colors" id="colors-${item.id}"></div>
+          <textarea placeholder="Detailed description..." oninput="updateItem('${item.id}', 'desc', this.value)">${item.desc}</textarea>
+        `;
+
+        container.appendChild(card);
+        renderColorSwatches(document.getElementById(`colors-${item.id}`), item.color, (newColor) => {
+          updateItem(item.id, 'color', newColor);
+          renderItems(); // Re-render to update swatch selection
+        });
+      });
+    }
+
+    function renderGlobal() {
+      renderColorSwatches(
+        document.getElementById('connector-colors'),
+        state.connectorColor,
+        (color) => { state.connectorColor = color; renderGlobal(); }
+      );
+
+      const btn = document.getElementById('save-btn');
+      btn.textContent = state.mode === 'edit' ? 'Save Changes' : 'Create Annotation';
+    }
+
+    // Actions
+    window.updateItem = (id, field, value) => {
+      const item = state.items.find(i => i.id === id);
+      if (item) item[field] = value;
+    };
+
+    window.removeItem = (id) => {
+      state.items = state.items.filter(i => i.id !== id);
+      renderItems();
+    };
+
+    document.getElementById('add-item').onclick = () => {
+      state.items.push({ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' });
+      renderItems();
+    };
+
+    document.getElementById('save-btn').onclick = () => {
+      const validItems = state.items.filter(i => i.title.trim() || i.desc.trim());
+      if (validItems.length === 0) {
+        parent.postMessage({ pluginMessage: { type: 'notify', message: 'Please enter at least one annotation.' } }, '*');
+        return;
+      }
+
+      const payload = {
+        connectorColor: state.connectorColor,
+        items: validItems
+      };
+
+      parent.postMessage({
+        pluginMessage: {
+          type: state.mode === 'edit' ? 'update-annotation' : 'create-annotation',
+          data: payload
+        }
+      }, '*');
+    };
+
+    // Listen for state updates from Figma
+    onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (msg.type === 'set-state') {
+        state.mode = msg.mode;
+        if (msg.data) {
+          state.connectorColor = msg.data.connectorColor || '#F24822';
+          state.items = msg.data.items && msg.data.items.length > 0 ? msg.data.items : [{ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }];
+        } else {
+          // Reset for create mode
+          state.connectorColor = '#F24822';
+          state.items = [{ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }];
+        }
+        renderGlobal();
+        renderItems();
+      }
+    };
+
+    // Initial render
+    renderGlobal();
+    renderItems();
+  </script>
+</body>
+
+</html>
