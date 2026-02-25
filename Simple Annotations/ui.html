@@ -204,6 +204,89 @@
       color: #FF5A50;
     }
 
+    .tag-dropdown {
+      position: absolute;
+      top: 100%;
+      margin-top: 4px;
+      left: 0;
+      right: 0;
+      background-color: #2C2C2E;
+      border: 1px solid #3A3A3C;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .tag-dropdown.visible {
+      display: block;
+    }
+
+    .tag-section-header {
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: -0.2px;
+      background-color: #242426;
+      border-bottom: 1px solid #3A3A3C;
+    }
+
+    .tag-section-header:not(:first-child) {
+      border-top: 1px solid #3A3A3C;
+    }
+
+    .tag-option {
+      padding: 8px 10px;
+      font-size: 13px;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .tag-option:hover {
+      background-color: #3A3A3C;
+    }
+
+    .tag-color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .tag-create-prompt {
+      color: #0A84FF;
+      font-weight: 500;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrapper input[type="text"] {
+      padding-right: 32px;
+    }
+
+    .dropdown-chevron {
+      position: absolute;
+      right: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      pointer-events: none;
+      transition: transform 0.2s ease;
+    }
+
+    .input-wrapper:focus-within .dropdown-chevron {
+      transform: rotate(180deg);
+    }
+
     #items-container {
       display: flex;
       flex-direction: column;
@@ -335,7 +418,9 @@
       connectorColor: '#F24822',
       items: [
         { id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }
-      ]
+      ],
+      clientTags: [],
+      documentTags: []
     };
 
     function renderColorSwatches(containerEl, selectedColor, onSelect) {
@@ -362,7 +447,16 @@
             <span style="font-size: 12px; color: #888;">Note ${index + 1}</span>
             ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
           </div>
-          <input type="text" placeholder="Short Label (e.g. BID)" value="${item.title}" oninput="updateItem('${item.id}', 'title', this.value)" />
+          <div class="input-wrapper">
+            <input type="text" placeholder="Short Label (e.g. BID)" value="${item.title}" 
+                   oninput="updateItem('${item.id}', 'title', this.value); filterTags('${item.id}', this.value)"
+                   onfocus="filterTags('${item.id}', this.value)"
+                   onblur="setTimeout(() => closeTagDropdown('${item.id}'), 200)" />
+            <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div id="tag-dropdown-${item.id}" class="tag-dropdown"></div>
+          </div>
           <div class="colors" id="colors-${item.id}"></div>
           <textarea placeholder="Detailed description..." oninput="updateItem('${item.id}', 'desc', this.value)">${item.desc}</textarea>
         `;
@@ -374,6 +468,93 @@
         });
       });
     }
+
+    // Tags Dropdown Logic
+    window.filterTags = (itemId, query) => {
+      const dropdown = document.getElementById(`tag-dropdown-${itemId}`);
+      if (!dropdown) return;
+
+      dropdown.innerHTML = '';
+      const q = query.trim().toLowerCase();
+
+      // 1. Matched Client Tags (Your Labels)
+      const matchedClientTags = state.clientTags.filter(t => t.title.toLowerCase().includes(q));
+
+      // 2. Matched Document Tags (In This Document) that aren't already in clientTags
+      const matchedDocTags = state.documentTags.filter(t =>
+        t.title.toLowerCase().includes(q) &&
+        !state.clientTags.some(ct => ct.title.toLowerCase() === t.title.toLowerCase())
+      );
+
+      // Render Client Tags
+      if (matchedClientTags.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'tag-section-header';
+        header.textContent = 'Your Labels';
+        dropdown.appendChild(header);
+
+        matchedClientTags.forEach(tag => {
+          const option = document.createElement('div');
+          option.className = 'tag-option';
+          option.innerHTML = `
+            <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
+            ${tag.title}
+          `;
+          option.onclick = () => selectTag(itemId, tag);
+          dropdown.appendChild(option);
+        });
+      }
+
+      // Render Document Tags
+      if (matchedDocTags.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'tag-section-header';
+        header.textContent = 'In This Document';
+        dropdown.appendChild(header);
+
+        matchedDocTags.forEach(tag => {
+          const option = document.createElement('div');
+          option.className = 'tag-option';
+          option.innerHTML = `
+            <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
+            ${tag.title}
+          `;
+          option.onclick = () => selectTag(itemId, tag);
+          dropdown.appendChild(option);
+        });
+      }
+
+      // Provide create option if exact match doesn't exist AND query is not empty
+      const exactMatchClient = state.clientTags.some(t => t.title.toLowerCase() === q);
+      const exactMatchDoc = state.documentTags.some(t => t.title.toLowerCase() === q);
+
+      if (!exactMatchClient && !exactMatchDoc && q.length > 0) {
+        const createOption = document.createElement('div');
+        createOption.className = 'tag-option tag-create-prompt';
+        createOption.innerHTML = `Create "${query}"`;
+        createOption.onclick = () => closeTagDropdown(itemId);
+        dropdown.appendChild(createOption);
+      }
+
+      const hasResults = matchedClientTags.length > 0 || matchedDocTags.length > 0 || (!exactMatchClient && !exactMatchDoc && q.length > 0);
+      if (hasResults) {
+        dropdown.classList.add('visible');
+      } else {
+        dropdown.classList.remove('visible');
+      }
+    };
+
+    window.closeTagDropdown = (itemId) => {
+      const dropdown = document.getElementById(`tag-dropdown-${itemId}`);
+      if (dropdown) dropdown.classList.remove('visible');
+    };
+
+    window.selectTag = (itemId, tag) => {
+      updateItem(itemId, 'title', tag.title);
+      updateItem(itemId, 'color', tag.color);
+      updateItemsWithoutLosingFocus(state.items);
+      closeTagDropdown(itemId);
+    };
 
     function renderGlobal() {
       // Theme toggles
@@ -445,6 +626,34 @@
         return;
       }
 
+      // Update global tags (only personal clientTags)
+      state.items.forEach(item => {
+        const title = item.title.trim();
+        if (title) {
+          const existingClientTagIndex = state.clientTags.findIndex(t => t.title.toLowerCase() === title.toLowerCase());
+
+          if (existingClientTagIndex > -1) {
+            // Update color if changed
+            state.clientTags[existingClientTagIndex].color = item.color;
+            // Also update case if they typed it differently
+            state.clientTags[existingClientTagIndex].title = title;
+          } else {
+            // Only add to clientTags if they explicitly typed something new that isn't their personal tag.
+            // Even if it exists in documentTags, editing it or saving an annotation utilizing it 
+            // will upgrade it to a personal tag so they can take it with them.
+            state.clientTags.push({ title, color: item.color });
+          }
+        }
+      });
+
+      // Send tags to backend to persist
+      parent.postMessage({
+        pluginMessage: {
+          type: 'save-tags',
+          data: state.clientTags
+        }
+      }, '*');
+
       const payload = {
         theme: state.theme,
         matchStroke: state.matchStroke,
@@ -511,6 +720,9 @@
       const msg = event.data.pluginMessage;
       if (msg.type === 'set-state') {
         state.mode = msg.mode;
+        state.clientTags = msg.clientTags || [];
+        state.documentTags = msg.documentTags || [];
+
         if (msg.data) {
           state.theme = msg.data.theme || 'dark';
           state.matchStroke = !!msg.data.matchStroke;

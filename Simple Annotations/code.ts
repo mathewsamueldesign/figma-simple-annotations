@@ -39,9 +39,41 @@ function getTopLevelFrame(node: BaseNode): BaseNode {
   return topParent;
 }
 
+// Fetch tags: clientStorage (personal) vs scanning the current page (document)
+async function getTagsData() {
+  const clientTagsStr = await figma.clientStorage.getAsync('savedTags');
+  const clientTags: { title: string, color: string }[] = clientTagsStr ? JSON.parse(clientTagsStr) : [];
+
+  const docMap = new Map<string, { title: string, color: string }>();
+
+  // Extract from existing document annotations
+  const annotationFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
+  for (const frame of annotationFrames) {
+    const dataStr = frame.getPluginData('annotationData');
+    if (dataStr) {
+      try {
+        const data = JSON.parse(dataStr) as AnnotationData;
+        if (data.items) {
+          for (const item of data.items) {
+            if (item.title && item.title.trim()) {
+              const title = item.title.trim();
+              docMap.set(title.toLowerCase(), { title, color: item.color });
+            }
+          }
+        }
+      } catch (e) { }
+    }
+  }
+
+  const documentTags = Array.from(docMap.values());
+  return { clientTags, documentTags };
+}
+
 // Check selection and update UI state
-figma.on('selectionchange', () => {
+figma.on('selectionchange', async () => {
   const selection = figma.currentPage.selection;
+  const { clientTags, documentTags } = await getTagsData();
+
   if (selection.length === 1) {
     let node = selection[0];
 
@@ -57,7 +89,7 @@ figma.on('selectionchange', () => {
     if (dataString) {
       try {
         const data = JSON.parse(dataString);
-        figma.ui.postMessage({ type: 'set-state', mode: 'edit', data });
+        figma.ui.postMessage({ type: 'set-state', mode: 'edit', data, clientTags, documentTags });
         return;
       } catch (e) {
         console.error("Failed to parse annotation data", e);
@@ -66,7 +98,7 @@ figma.on('selectionchange', () => {
   }
 
   // If no single annotation is selected, default to create mode
-  figma.ui.postMessage({ type: 'set-state', mode: 'create' });
+  figma.ui.postMessage({ type: 'set-state', mode: 'create', clientTags, documentTags });
 });
 
 // Auto-update connectors when moving things
@@ -442,7 +474,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?: string }) => {
+figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
     return;
@@ -450,6 +482,11 @@ figma.ui.onmessage = async (msg: { type: string, data?: AnnotationData, message?
 
   if (msg.type === 'close-plugin') {
     figma.closePlugin();
+    return;
+  }
+
+  if (msg.type === 'save-tags' && msg.data) {
+    await figma.clientStorage.setAsync('savedTags', JSON.stringify(msg.data));
     return;
   }
 
