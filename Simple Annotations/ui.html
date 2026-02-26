@@ -660,6 +660,16 @@
       textarea.style.height = (textarea.scrollHeight) + 'px';
     }
 
+    // Sanitize user input before inserting into innerHTML
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     // Tags Dropdown Logic
     window.filterTags = (itemId, query) => {
       const dropdown = document.getElementById(`tag-dropdown-${itemId}`);
@@ -688,8 +698,8 @@
           const option = document.createElement('div');
           option.className = 'tag-option';
           option.innerHTML = `
-            <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
-            <span class="tag-title-text">${tag.title}</span>
+            <div class="tag-color-dot" style="background-color: ${escapeHtml(tag.color)}"></div>
+            <span class="tag-title-text">${escapeHtml(tag.title)}</span>
             <button class="delete-tag-btn" title="Delete Label">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 3.5H11.5M4.5 3.5V2.5C4.5 1.94772 4.94772 1.5 5.5 1.5H8.5C9.05228 1.5 9.5 1.94772 9.5 2.5V3.5M5.5 6.5V10.5M8.5 6.5V10.5M3.5 3.5V11.5C3.5 12.0523 3.94772 12.5 4.5 12.5H9.5C10.0523 12.5 10.5 12.0523 10.5 11.5V3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -724,8 +734,8 @@
           const option = document.createElement('div');
           option.className = 'tag-option';
           option.innerHTML = `
-            <div class="tag-color-dot" style="background-color: ${tag.color}"></div>
-            <span class="tag-title-text">${tag.title}</span>
+            <div class="tag-color-dot" style="background-color: ${escapeHtml(tag.color)}"></div>
+            <span class="tag-title-text">${escapeHtml(tag.title)}</span>
           `;
           option.onclick = () => selectTag(itemId, tag);
           dropdown.appendChild(option);
@@ -739,7 +749,7 @@
       if (!exactMatchClient && !exactMatchDoc && q.length > 0) {
         const createOption = document.createElement('div');
         createOption.className = 'tag-option tag-create-prompt tag-title-text';
-        createOption.innerHTML = `Create "${query}"`;
+        createOption.textContent = `Create "${query}"`;
         createOption.onclick = () => closeTagDropdown(itemId);
         dropdown.appendChild(createOption);
       }
