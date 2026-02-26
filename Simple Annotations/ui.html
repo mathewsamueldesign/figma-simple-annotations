@@ -66,6 +66,25 @@
       gap: 10px;
     }
 
+    .info-banner {
+      background-color: rgba(10, 132, 255, 0.15);
+      border: 1px solid rgba(10, 132, 255, 0.25);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .info-banner svg {
+      color: #0A84FF;
+      margin-top: 2px;
+    }
+
     label {
       font-size: 11px;
       font-weight: 600;
@@ -410,8 +429,20 @@
 </head>
 
 <body>
-  <div class="header">
-    <div class="segmented-control" id="theme-control">
+  <div class="header" style="padding-bottom: 4px;">
+    <div class="info-banner" style="margin-bottom: 12px;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
+        style="flex-shrink: 0;">
+        <path
+          d="M8 10.5V7M8 5H8.01M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C11.3137 2 14 4.68629 14 8Z"
+          stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span>Keep this window open if you plan on editing or dragging annotations around the canvas.</span>
+    </div>
+  </div>
+
+  <div class="main-scroll-area" style="padding-top: 4px;">
+    <div class="segmented-control" id="theme-control" style="margin-bottom: 12px;">
       <div class="segment active" data-theme="dark">Dark</div>
       <div class="segment" data-theme="light">Light</div>
     </div>
@@ -425,12 +456,9 @@
         </label>
       </div>
     </div>
-    <div class="card" style="padding: 10px 12px;">
+    <div class="card" style="padding: 10px 12px; margin-bottom: 12px;">
       <div class="colors" id="connector-colors"></div>
     </div>
-  </div>
-
-  <div class="main-scroll-area">
     <label>Annotations</label>
     <div id="items-container"></div>
     <button class="secondary" id="add-item">+ Add Note</button>
