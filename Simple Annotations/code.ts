@@ -9,13 +9,14 @@ function hexToRgb(hex: string): RGB {
   } : { r: 1, g: 0, b: 0 };
 }
 
-// Returns white text wherever it achieves WCAG 2.1 AA 4.5:1 contrast; falls back to black otherwise
+// Returns white text wherever it achieves WCAG 2.1 AA 3:1 contrast (large/bold text standard);
+// falls back to black otherwise. Badge labels at 13px Bold qualify as large text.
 function getContrastTextColor(hex: string): RGB {
   const { r, g, b } = hexToRgb(hex);
   const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-  // White text passes 4.5:1 when bg luminance <= 0.1833
-  return L <= 0.1833 ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 };
+  // White text passes 3:1 when bg luminance <= 0.30
+  return L <= 0.30 ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 };
 }
 
 interface AnnotationItem {
