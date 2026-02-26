@@ -579,7 +579,7 @@
             </div>
           </div>
           <div class="input-wrapper ${hasTags ? 'has-tags' : ''}">
-            <input type="text" placeholder="Short Label (e.g. BID)" value="${item.title}" 
+            <input type="text" placeholder="Short Label (e.g. SEO)" value="${item.title}" 
                    oninput="updateItem('${item.id}', 'title', this.value); filterTags('${item.id}', this.value)"
                    onfocus="filterTags('${item.id}', this.value)"
                    onblur="setTimeout(() => closeTagDropdown('${item.id}'), 200)" />
