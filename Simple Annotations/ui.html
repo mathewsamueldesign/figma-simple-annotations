@@ -429,20 +429,28 @@
       z-index: 2;
     }
 
-    .icon-toggle-icon svg {
+    .icon-toggle-icon.sun-slot svg {
       width: 11px;
       height: 11px;
-      color: rgba(255, 255, 255, 0.6);
+      color: white;
+      transition: color 0.2s ease;
+      display: block;
+    }
+
+    .icon-toggle-icon.moon-slot svg {
+      width: 11px;
+      height: 11px;
+      color: #1C1C3A;
       transition: color 0.2s ease;
       display: block;
     }
 
     .icon-toggle.light .icon-toggle-icon.moon-slot svg {
-      color: rgba(255, 255, 255, 0.25);
+      color: rgba(255, 255, 255, 0.35);
     }
 
     .icon-toggle.dark .icon-toggle-icon.sun-slot svg {
-      color: rgba(255, 255, 255, 0.25);
+      color: rgba(255, 255, 255, 0.35);
     }
 
     /* Switch */
