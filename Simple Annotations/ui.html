@@ -680,6 +680,7 @@
       state.items.forEach((item, index) => {
         const card = document.createElement('div');
         card.className = 'item-card';
+        card.dataset.itemId = item.id;
 
         const hasTags = (state.clientTags && state.clientTags.length > 0) || (state.documentTags && state.documentTags.length > 0);
 
@@ -1022,6 +1023,14 @@
           renderItems();
         }
         renderGlobal();
+
+        // Scroll to the focused item if one was identified from the canvas selection
+        if (msg.focusItemId) {
+          requestAnimationFrame(() => {
+            const card = document.querySelector(`[data-item-id="${msg.focusItemId}"]`);
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        }
       }
     };
 

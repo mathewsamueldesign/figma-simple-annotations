@@ -95,15 +95,22 @@ async function emitState() {
     }
 
     // If the node itself isn't an annotation, walk up the parent chain to find one
-    // This allows selecting any child element (badge, text, connector) to trigger edit mode
+    // Also detect which Item Row the selection is inside, for scroll-to focus
+    let focusItemId: string | null = null;
     if (!node.getPluginData('annotationData')) {
-      let parent: BaseNode | null = node.parent;
-      while (parent && parent.type !== 'PAGE') {
-        if (parent.type === 'FRAME' && (parent as FrameNode).getPluginData('annotationData')) {
-          node = parent as SceneNode;
-          break;
+      let cursor: BaseNode | null = selection[0];
+      while (cursor && cursor.type !== 'PAGE') {
+        if ('getPluginData' in cursor) {
+          const asFrame = cursor as FrameNode;
+          if (cursor.name === 'Item Row' && !focusItemId) {
+            focusItemId = asFrame.getPluginData('itemId') || null;
+          }
+          if (cursor.type === 'FRAME' && asFrame.getPluginData('annotationData')) {
+            node = cursor as SceneNode;
+            break;
+          }
         }
-        parent = parent.parent;
+        cursor = cursor.parent;
       }
     }
 
@@ -111,7 +118,7 @@ async function emitState() {
     if (dataString) {
       try {
         const data = JSON.parse(dataString);
-        figma.ui.postMessage({ type: 'set-state', mode: 'edit', data, clientTags, documentTags });
+        figma.ui.postMessage({ type: 'set-state', mode: 'edit', data, clientTags, documentTags, focusItemId });
         return;
       } catch (e) {
         console.error("Failed to parse annotation data", e);
