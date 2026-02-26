@@ -66,13 +66,12 @@
       gap: 10px;
     }
 
-    .connector-card {
-      background-color: #1C1C1E;
-      border-radius: 12px;
-      padding: 12px;
-      display: flex;
+    /* Row variant: flex row, items centered */
+    .card--row {
+      flex-direction: row;
       align-items: center;
-      margin-bottom: 12px;
+      gap: 0;
+      margin-bottom: 0;
     }
 
     .info-banner {
@@ -378,6 +377,56 @@
       gap: 12px;
     }
 
+    /* Connector card internals */
+    .connector-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #888;
+      margin-right: auto;
+      flex-shrink: 0;
+    }
+
+    .connector-colors-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .connector-colors-wrap .colors {
+      gap: 6px;
+    }
+
+    /* Annotations section header */
+    .annotations-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+    }
+
+    .annotations-header label {
+      margin: 0;
+    }
+
+    .annotations-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .border-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .border-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+      font-weight: 500;
+    }
+
     /* Theme Toggle */
     .icon-toggle {
       display: flex;
@@ -523,20 +572,19 @@
     </div>
   </div>
 
-  <div class="main-scroll-area" style="padding-top: 4px;">
-    <div class="connector-card">
-      <span style="font-size: 13px; font-weight: 500; color: #888; margin-right: auto; flex-shrink: 0;">Connector</span>
-      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-        <div class="colors" id="connector-colors" style="gap: 6px;"></div>
+  <div class="main-scroll-area">
+    <div class="card card--row">
+      <span class="connector-label">Connector</span>
+      <div class="connector-colors-wrap">
+        <div class="colors" id="connector-colors"></div>
       </div>
     </div>
 
-    <div
-      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;">
-      <label style="margin: 0;">Annotations</label>
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 11px; color: rgba(255, 255, 255, 0.4); font-weight: 500;">Border</span>
+    <div class="annotations-header">
+      <label>Annotations</label>
+      <div class="annotations-controls">
+        <div class="border-control">
+          <span class="border-label">Border</span>
           <label class="switch">
             <input type="checkbox" id="match-stroke" onchange="toggleMatchStroke(this.checked)">
             <span class="slider"></span>
@@ -810,11 +858,6 @@
 
       const btn = document.getElementById('save-btn');
       btn.textContent = state.mode === 'edit' ? 'Done' : 'Create Annotation';
-      if (state.mode === 'edit') {
-        btn.onclick = () => { parent.postMessage({ pluginMessage: { type: 'close-plugin' } }, '*'); };
-      } else {
-        btn.onclick = saveAnnotation;
-      }
     }
 
     window.toggleTheme = () => {
@@ -973,6 +1016,15 @@
     // Initial render
     renderGlobal();
     renderItems();
+
+    // Wire save-btn once — reads state.mode at call time
+    document.getElementById('save-btn').onclick = () => {
+      if (state.mode === 'edit') {
+        parent.postMessage({ pluginMessage: { type: 'close-plugin' } }, '*');
+      } else {
+        saveAnnotation();
+      }
+    };
   </script>
 </body>
 
