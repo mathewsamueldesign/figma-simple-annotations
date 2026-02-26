@@ -133,12 +133,14 @@
     }
 
     .color-swatch {
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
       cursor: pointer;
-      border: 2px solid transparent;
-      transition: transform 0.1s ease, border-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease;
     }
 
     .color-swatch:hover {
@@ -146,8 +148,6 @@
     }
 
     .color-swatch.selected {
-      border-color: #FFFFFF;
-      box-shadow: 0 0 0 2px #000000;
       transform: scale(1.15);
     }
 
@@ -385,6 +385,7 @@
       display: inline-block;
       width: 32px;
       height: 18px;
+      margin: 0;
     }
 
     .switch input {
@@ -449,7 +450,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <label style="margin: 0;">Connector Color</label>
       <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 11px; color: #888; font-weight: 500;">Match Stroke</span>
+        <span style="font-size: 11px; color: #888; font-weight: 500;">Border</span>
         <label class="switch">
           <input type="checkbox" id="match-stroke" onchange="toggleMatchStroke(this.checked)">
           <span class="slider"></span>
@@ -497,6 +498,9 @@
         const swatch = document.createElement('div');
         swatch.className = `color-swatch ${color === selectedColor ? 'selected' : ''}`;
         swatch.style.backgroundColor = color;
+        if (color === selectedColor) {
+          swatch.innerHTML = `<svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        }
         swatch.onclick = () => onSelect(color);
         containerEl.appendChild(swatch);
       });
@@ -514,8 +518,11 @@
 
         card.innerHTML = `
           <div class="item-header">
-            <span style="font-size: 12px; color: #888;">Note ${index + 1}</span>
-            ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
+            <span style="font-size: 12px; font-weight: 600; color: #888; margin-right: auto;">Note ${index + 1}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="colors" id="colors-${item.id}" style="width: auto; gap: 6px; justify-content: flex-end;"></div>
+              ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
+            </div>
           </div>
           <div class="input-wrapper ${hasTags ? 'has-tags' : ''}">
             <input type="text" placeholder="Short Label (e.g. BID)" value="${item.title}" 
@@ -528,7 +535,6 @@
             </svg>` : ''}
             <div id="tag-dropdown-${item.id}" class="tag-dropdown"></div>
           </div>
-          <div class="colors" id="colors-${item.id}"></div>
           <textarea placeholder="Detailed description..." oninput="updateItem('${item.id}', 'desc', this.value)">${item.desc}</textarea>
         `;
 
