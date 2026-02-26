@@ -15,8 +15,8 @@ function getContrastTextColor(hex: string): RGB {
   const { r, g, b } = hexToRgb(hex);
   const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-  // White text passes ~2.8:1+ when bg luminance <= 0.35
-  return L <= 0.35 ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 };
+  // White text passes 3:1 when bg luminance <= 0.30
+  return L <= 0.30 ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 };
 }
 
 interface AnnotationItem {
