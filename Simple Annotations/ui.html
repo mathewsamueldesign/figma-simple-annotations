@@ -111,8 +111,9 @@
     }
 
     textarea {
-      resize: none;
-      height: 60px;
+      resize: vertical;
+      min-height: 60px;
+      overflow: hidden;
       line-height: 1.4;
     }
 
@@ -141,6 +142,7 @@
       align-items: center;
       justify-content: center;
       transition: transform 0.1s ease;
+      flex-shrink: 0;
     }
 
     .color-swatch:hover {
@@ -518,9 +520,9 @@
 
         card.innerHTML = `
           <div class="item-header">
-            <span style="font-size: 12px; font-weight: 600; color: #888; margin-right: auto;">Note ${index + 1}</span>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <div class="colors" id="colors-${item.id}" style="width: auto; gap: 6px; justify-content: flex-end;"></div>
+            <span style="font-size: 12px; font-weight: 600; color: #888; margin-right: auto; flex-shrink: 0;">Note ${index + 1}</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <div class="colors" id="colors-${item.id}" style="width: auto; gap: 5px; justify-content: flex-end;"></div>
               ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
             </div>
           </div>
@@ -535,15 +537,22 @@
             </svg>` : ''}
             <div id="tag-dropdown-${item.id}" class="tag-dropdown"></div>
           </div>
-          <textarea placeholder="Detailed description..." oninput="updateItem('${item.id}', 'desc', this.value)">${item.desc}</textarea>
+          <textarea id="desc-${item.id}" placeholder="Detailed description..." oninput="updateItem('${item.id}', 'desc', this.value); autoResize(this)">${item.desc}</textarea>
         `;
 
         container.appendChild(card);
+        const thisTextarea = document.getElementById(`desc-${item.id}`);
+        if (thisTextarea) autoResize(thisTextarea);
         renderColorSwatches(document.getElementById(`colors-${item.id}`), item.color, (newColor) => {
           updateItem(item.id, 'color', newColor);
           updateItemsWithoutLosingFocus(state.items); // Smart re-render!
         });
       });
+    }
+
+    function autoResize(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = (textarea.scrollHeight) + 'px';
     }
 
     // Tags Dropdown Logic
