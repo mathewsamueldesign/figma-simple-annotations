@@ -501,7 +501,7 @@
     }
 
     input:checked+.slider {
-      background-color: #0A84FF;
+      background-color: var(--connector-color, #0A84FF);
     }
 
     input:checked+.slider:before {
@@ -794,7 +794,9 @@
         }
       );
 
-      document.getElementById('match-stroke').checked = state.matchStroke;
+      const matchStrokeEl = document.getElementById('match-stroke');
+      matchStrokeEl.checked = state.matchStroke;
+      matchStrokeEl.closest('.switch').style.setProperty('--connector-color', state.connectorColor);
 
       const btn = document.getElementById('save-btn');
       btn.textContent = state.mode === 'edit' ? 'Done' : 'Create Annotation';
