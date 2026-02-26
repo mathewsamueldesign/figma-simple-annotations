@@ -66,6 +66,15 @@
       gap: 10px;
     }
 
+    .connector-card {
+      background-color: #1C1C1E;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
     .info-banner {
       background-color: rgba(10, 132, 255, 0.15);
       border: 1px solid rgba(10, 132, 255, 0.25);
@@ -130,7 +139,7 @@
 
     .colors {
       display: flex;
-      justify-content: space-between;
+      gap: 8px;
     }
 
     .color-swatch {
@@ -354,31 +363,59 @@
       gap: 12px;
     }
 
-    /* Segmented Control */
-    .segmented-control {
-      background-color: #1C1C1E;
-      border-radius: 8px;
+    /* Theme Toggle */
+    .icon-toggle {
       display: flex;
-      padding: 4px;
-      margin-bottom: 20px;
-    }
-
-    .segment {
-      flex: 1;
-      text-align: center;
-      padding: 6px 0;
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.6);
-      border-radius: 6px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 2px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      position: relative;
+      width: 48px;
+      height: 24px;
+      box-sizing: border-box;
     }
 
-    .segment.active {
-      background-color: #3A3A3C;
-      color: #FFFFFF;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    .icon-toggle-bg {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background-color: #6C6C70;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+      z-index: 1;
+    }
+
+    .icon-toggle.light .icon-toggle-bg {
+      transform: translateX(0);
+    }
+
+    .icon-toggle.dark .icon-toggle-bg {
+      transform: translateX(24px);
+    }
+
+    .icon-toggle svg {
+      width: 12px;
+      height: 12px;
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: auto;
+      color: rgba(255, 255, 255, 0.4);
+      transition: color 0.2s ease;
+    }
+
+    .icon-toggle.light svg.sun-icon {
+      color: white;
+    }
+
+    .icon-toggle.dark svg.moon-icon {
+      color: white;
     }
 
     /* Switch */
@@ -404,7 +441,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(255, 255, 255, 0.15);
+      background-color: rgba(255, 255, 255, 0.25);
       transition: .2s;
       border-radius: 18px;
     }
@@ -445,24 +482,39 @@
   </div>
 
   <div class="main-scroll-area" style="padding-top: 4px;">
-    <div class="segmented-control" id="theme-control" style="margin-bottom: 12px;">
-      <div class="segment active" data-theme="dark">Dark</div>
-      <div class="segment" data-theme="light">Light</div>
-    </div>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-      <label style="margin: 0;">Connector Color</label>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 11px; color: #888; font-weight: 500;">Border</span>
-        <label class="switch">
-          <input type="checkbox" id="match-stroke" onchange="toggleMatchStroke(this.checked)">
-          <span class="slider"></span>
-        </label>
+    <div class="connector-card">
+      <span style="font-size: 13px; font-weight: 500; color: #888; margin-right: auto; flex-shrink: 0;">Connector</span>
+      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+        <div class="colors" id="connector-colors" style="gap: 6px;"></div>
       </div>
     </div>
-    <div class="card" style="padding: 10px 12px; margin-bottom: 12px;">
-      <div class="colors" id="connector-colors"></div>
+
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;">
+      <label style="margin: 0;">Annotations</label>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 11px; color: rgba(255, 255, 255, 0.4); font-weight: 500;">Border</span>
+          <label class="switch">
+            <input type="checkbox" id="match-stroke" onchange="toggleMatchStroke(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div id="theme-toggle" class="icon-toggle" onclick="toggleTheme()">
+          <div class="icon-toggle-bg"></div>
+          <svg class="sun-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path
+              d="M8 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM8 12.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zM7.5 0h1v2.5h-1V0zm0 13.5h1V16h-1v-2.5zM16 7.5v1h-2.5v-1H16zM2.5 7.5v1H0v-1h2.5zm10.74-4.85l.707.707-1.768 1.768-.707-.707 1.768-1.768zm-9.192 9.192l.707.707-1.768 1.768-.707-.707 1.768-1.768zM14.95 13.394l-.707.707-1.768-1.768.707-.707 1.768 1.768zM4.444 2.889l-.707.707-1.768-1.768.707-.707 1.768 1.768z" />
+          </svg>
+          <svg class="moon-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path
+              d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.227 7.271 7.207 7.271.973 0 1.907-.197 2.768-.553a.76.76 0 0 1 .918.15.768.768 0 0 1 .151.916A8.76 8.76 0 0 1 8 16c-4.418 0-8-3.582-8-8 0-3.64 2.446-6.68 5.76-7.58a.74.74 0 0 1 .24-.142z" />
+          </svg>
+        </div>
+      </div>
     </div>
-    <label>Annotations</label>
+
     <div id="items-container"></div>
     <button class="secondary" id="add-item">+ Add Note</button>
   </div>
@@ -519,11 +571,11 @@
         const hasTags = (state.clientTags && state.clientTags.length > 0) || (state.documentTags && state.documentTags.length > 0);
 
         card.innerHTML = `
-          <div class="item-header">
-            <span style="font-size: 12px; font-weight: 600; color: #888; margin-right: auto; flex-shrink: 0;">Note ${index + 1}</span>
+          <div class="item-header" style="margin-bottom: 4px;">
+            <span style="font-size: 13px; font-weight: 500; color: #888; margin-right: auto; flex-shrink: 0;">Note ${index + 1}</span>
             <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-              <div class="colors" id="colors-${item.id}" style="width: auto; gap: 5px; justify-content: flex-end;"></div>
-              ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')">&times;</button>` : ''}
+              <div class="colors" id="colors-${item.id}" style="width: auto; gap: 6px; justify-content: flex-end;"></div>
+              ${state.items.length > 1 ? `<button class="remove-btn" onclick="removeItem('${item.id}')" style="margin-left: 4px;">&times;</button>` : ''}
             </div>
           </div>
           <div class="input-wrapper ${hasTags ? 'has-tags' : ''}">
@@ -673,22 +725,11 @@
     };
 
     function renderGlobal() {
-      // Theme toggles
-      const themeSegments = document.querySelectorAll('#theme-control .segment');
-      themeSegments.forEach(seg => {
-        if (seg.dataset.theme === state.theme) {
-          seg.classList.add('active');
-        } else {
-          seg.classList.remove('active');
-        }
-        seg.onclick = () => {
-          if (state.theme !== seg.dataset.theme) {
-            state.theme = seg.dataset.theme;
-            renderGlobal();
-            if (state.mode === 'edit') saveAnnotation();
-          }
-        };
-      });
+      // Theme toggle
+      const toggle = document.getElementById('theme-toggle');
+      if (toggle) {
+        toggle.className = `icon-toggle ${state.theme}`;
+      }
 
       renderColorSwatches(
         document.getElementById('connector-colors'),
@@ -710,6 +751,12 @@
         btn.onclick = saveAnnotation;
       }
     }
+
+    window.toggleTheme = () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      renderGlobal();
+      if (state.mode === 'edit') saveAnnotation();
+    };
 
     // Actions
     window.toggleMatchStroke = (checked) => {
