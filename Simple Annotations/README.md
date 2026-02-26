@@ -1,40 +1,46 @@
-Below are the steps to get your plugin running. You can also find instructions at:
+# Simple Annotations
 
-  https://www.figma.com/plugin-docs/plugin-quickstart-guide/
+A Figma plugin for attaching clean, structured annotation notes directly to elements on the canvas.
 
-This plugin template uses Typescript and NPM, two standard tools in creating JavaScript applications.
+---
 
-First, download Node.js which comes with NPM. This will allow you to install TypeScript and other
-libraries. You can find the download link here:
+## Features
 
-  https://nodejs.org/en/download/
+- **Multi-note annotations** — attach multiple labelled notes (short label + description) to any canvas element
+- **Color-coded labels** — choose from 7 swatch colors per note, with WCAG-accessible text contrast automatically applied
+- **Connector line** — a dashed connector with a dot automatically links the annotation to the selected element and updates when you move things around
+- **Light / Dark theme** — toggle between light and dark annotation card styles
+- **Border toggle** — optionally match the annotation border to the connector color
+- **Reusable labels** — labels you create are saved locally and suggested as you type, across sessions
+- **Document labels** — labels used anywhere in the current document also appear as suggestions
+- **Direct canvas editing** — edit annotation text directly on the canvas; changes sync back to the plugin
+- **Smart selection** — click any child element inside an annotation to load it into edit mode; the plugin scrolls to the matching note automatically
 
-Next, install TypeScript using the command:
+---
 
-  npm install -g typescript
+## How to Use
 
-Finally, in the directory of your plugin, get the latest type definitions for the plugin API by running:
+1. **Select an element** on the canvas you want to annotate
+2. **Open the plugin** — it will enter "Create" mode
+3. **Fill in your notes** — add a short label and/or description for each Note
+4. **Click "Create Annotation"** — the annotation card is placed to the right of your selection with a connector line drawn automatically
+5. **To edit** — select the annotation frame (or any element inside it) to reload it in the plugin, make changes, then click "Done"
 
-  npm install --save-dev @figma/plugin-typings
+### Tips
 
-If you are familiar with JavaScript, TypeScript will look very familiar. In fact, valid JavaScript code
-is already valid Typescript code.
+- The connector line updates automatically when you move either the annotation or the target element
+- You can add multiple Notes per annotation using the **+ Add Note** button
+- Labels you've used before will appear in the dropdown as you type — click to apply them quickly
+- Keep the plugin window open while moving annotations around the canvas for the connector to stay in sync
 
-TypeScript adds type annotations to variables. This allows code editors such as Visual Studio Code
-to provide information about the Figma API while you are writing code, as well as help catch bugs
-you previously didn't notice.
+---
 
-For more information, visit https://www.typescriptlang.org/
+## Privacy
 
-Using TypeScript requires a compiler to convert TypeScript (code.ts) into JavaScript (code.js)
-for the browser to run.
+Simple Annotations stores label data locally on your device using Figma's `clientStorage` API. No data is collected, transmitted, or shared with any third party. See [PRIVACY_POLICY.md](./PRIVACY_POLICY.md) for full details.
 
-We recommend writing TypeScript code using Visual Studio code:
+---
 
-1. Download Visual Studio Code if you haven't already: https://code.visualstudio.com/.
-2. Open this directory in Visual Studio Code.
-3. Compile TypeScript to JavaScript: Run the "Terminal > Run Build Task..." menu item,
-    then select "npm: watch". You will have to do this again every time
-    you reopen Visual Studio Code.
+## Support
 
-That's it! Visual Studio Code will regenerate the JavaScript file every time you save.
+Found a bug or have a feature request? [Open an issue on GitHub](https://github.com/mathewsamueldesign/figma-simple-annotations/issues).
