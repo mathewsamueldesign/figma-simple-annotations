@@ -389,6 +389,15 @@
       width: 48px;
       height: 24px;
       box-sizing: border-box;
+      transition: background-color 0.2s ease;
+    }
+
+    .icon-toggle.light {
+      background-color: #FF9F0A;
+    }
+
+    .icon-toggle.dark {
+      background-color: #5E5CE6;
     }
 
     .icon-toggle-bg {
@@ -397,7 +406,7 @@
       left: 2px;
       width: 20px;
       height: 20px;
-      background-color: #6C6C70;
+      background-color: white;
       border-radius: 50%;
       transition: transform 0.2s ease;
       z-index: 1;
@@ -411,26 +420,29 @@
       transform: translateX(24px);
     }
 
-    .icon-toggle svg {
-      width: 12px;
-      height: 12px;
-      position: relative;
-      z-index: 2;
+    .icon-toggle-icon {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: auto;
-      color: rgba(255, 255, 255, 0.4);
+      position: relative;
+      z-index: 2;
+    }
+
+    .icon-toggle-icon svg {
+      width: 11px;
+      height: 11px;
+      color: rgba(255, 255, 255, 0.6);
       transition: color 0.2s ease;
+      display: block;
     }
 
-    .icon-toggle.light svg.sun-icon {
-      color: white;
+    .icon-toggle.light .icon-toggle-icon.sun-slot svg {
+      color: rgba(255, 255, 255, 0.25);
     }
 
-    .icon-toggle.dark svg.moon-icon {
-      color: white;
+    .icon-toggle.dark .icon-toggle-icon.moon-slot svg {
+      color: rgba(255, 255, 255, 0.25);
     }
 
     /* Switch */
@@ -518,14 +530,18 @@
 
         <div id="theme-toggle" class="icon-toggle" onclick="toggleTheme()">
           <div class="icon-toggle-bg"></div>
-          <svg class="sun-icon" viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M8 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM8 12.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zM7.5 0h1v2.5h-1V0zm0 13.5h1V16h-1v-2.5zM16 7.5v1h-2.5v-1H16zM2.5 7.5v1H0v-1h2.5zm10.74-4.85l.707.707-1.768 1.768-.707-.707 1.768-1.768zm-9.192 9.192l.707.707-1.768 1.768-.707-.707 1.768-1.768zM14.95 13.394l-.707.707-1.768-1.768.707-.707 1.768 1.768zM4.444 2.889l-.707.707-1.768-1.768.707-.707 1.768 1.768z" />
-          </svg>
-          <svg class="moon-icon" viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.227 7.271 7.207 7.271.973 0 1.907-.197 2.768-.553a.76.76 0 0 1 .918.15.768.768 0 0 1 .151.916A8.76 8.76 0 0 1 8 16c-4.418 0-8-3.582-8-8 0-3.64 2.446-6.68 5.76-7.58a.74.74 0 0 1 .24-.142z" />
-          </svg>
+          <span class="icon-toggle-icon sun-slot">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M8 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM8 12.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zM7.5 0h1v2.5h-1V0zm0 13.5h1V16h-1v-2.5zM16 7.5v1h-2.5v-1H16zM2.5 7.5v1H0v-1h2.5zm10.74-4.85l.707.707-1.768 1.768-.707-.707 1.768-1.768zm-9.192 9.192l.707.707-1.768 1.768-.707-.707 1.768-1.768zM14.95 13.394l-.707.707-1.768-1.768.707-.707 1.768 1.768zM4.444 2.889l-.707.707-1.768-1.768.707-.707 1.768 1.768z" />
+            </svg>
+          </span>
+          <span class="icon-toggle-icon moon-slot">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.227 7.271 7.207 7.271.973 0 1.907-.197 2.768-.553a.76.76 0 0 1 .918.15.768.768 0 0 1 .151.916A8.76 8.76 0 0 1 8 16c-4.418 0-8-3.582-8-8 0-3.64 2.446-6.68 5.76-7.58a.74.74 0 0 1 .24-.142z" />
+            </svg>
+          </span>
         </div>
       </div>
     </div>
