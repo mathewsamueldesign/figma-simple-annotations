@@ -94,6 +94,19 @@ async function emitState() {
       }
     }
 
+    // If the node itself isn't an annotation, walk up the parent chain to find one
+    // This allows selecting any child element (badge, text, connector) to trigger edit mode
+    if (!node.getPluginData('annotationData')) {
+      let parent: BaseNode | null = node.parent;
+      while (parent && parent.type !== 'PAGE') {
+        if (parent.type === 'FRAME' && (parent as FrameNode).getPluginData('annotationData')) {
+          node = parent as SceneNode;
+          break;
+        }
+        parent = parent.parent;
+      }
+    }
+
     const dataString = node.getPluginData('annotationData');
     if (dataString) {
       try {
