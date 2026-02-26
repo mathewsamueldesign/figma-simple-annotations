@@ -61,7 +61,7 @@ async function getTagsData() {
             }
           }
         }
-      } catch (e) { }
+      } catch (e) { console.error('Failed to parse annotation data for tag scan', e); }
     }
   }
 
@@ -165,15 +165,13 @@ emitState();
                     // Save and re-sync
                     annotationFrame.setPluginData('annotationData', JSON.stringify(data));
 
-                    // If this frame is currently selected, update the UI side too
+                    // If this frame is currently selected, update the full UI state
                     const selection = figma.currentPage.selection;
                     if (selection.length === 1 && selection[0].id === annotationFrame.id) {
-                      figma.ui.postMessage({ type: 'set-state', mode: 'edit', data });
+                      emitState(); // emitState is async and includes clientTags + documentTags
                     }
                   }
-                } catch (e) {
-                  console.error("Failed to sync text change", e);
-                }
+                } catch (e) { console.error('Failed to sync text change to plugin data', e); }
               }
             }
           }
@@ -191,7 +189,7 @@ emitState();
               if (data.targetNodeId) {
                 updateConnector(frame as FrameNode, data);
               }
-            } catch (e) { }
+            } catch (e) { console.error('Failed to update connector after document change', e); }
           }
         }
       }
@@ -531,10 +529,12 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
       targetY = targetNode.y;
     }
 
-    // Collision detection: Shift down if overlapping with existing annotations
+    // Collision detection: shift down if overlapping with existing annotations
     const existingAnnotations = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } }).filter(n => n.id !== frame.id);
     let isOverlapping = true;
-    while (isOverlapping) {
+    let safetyGuard = 0;
+    while (isOverlapping && safetyGuard < 100) {
+      safetyGuard++;
       isOverlapping = false;
       for (const existing of existingAnnotations) {
         if ('absoluteBoundingBox' in existing && existing.absoluteBoundingBox) {
@@ -592,7 +592,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
         if (existingData.targetNodeId) {
           msg.data.targetNodeId = existingData.targetNodeId;
         }
-      } catch (e) { }
+      } catch (e) { console.error('Failed to parse existing annotation data during update', e); }
     }
 
     await buildAnnotationContent(frame, msg.data);
