@@ -633,5 +633,8 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
     await buildAnnotationContent(frame, msg.data);
     frame.setPluginData('annotationData', JSON.stringify(msg.data));
     updateConnector(frame as FrameNode, msg.data);
+    // Re-select the annotation frame — child elements are removed/re-added during rebuild
+    // so the previous child selection is lost; this keeps the plugin in edit mode
+    figma.currentPage.selection = [frame];
   }
 };
