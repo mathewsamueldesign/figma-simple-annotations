@@ -1011,7 +1011,11 @@
             const activeSwatch = colorsContainer.querySelector('.color-swatch.selected');
             if (!activeSwatch || activeSwatch.style.backgroundColor !== hexToRgbStr(item.color)) {
               renderColorSwatches(colorsContainer, item.color, (newColor) => {
-                updateItem(item.id, 'color', newColor);
+                const it = state.items.find(i => i.id === item.id);
+                if (it) it.color = newColor;
+                if (state.mode === 'edit') {
+                  parent.postMessage({ pluginMessage: { type: 'update-item-color', itemId: item.id, color: newColor } }, '*');
+                }
                 updateItemsWithoutLosingFocus(state.items);
               });
             }
