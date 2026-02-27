@@ -10,7 +10,6 @@
     "figma"
   ],
   "ui": "ui.html",
-  "menuIcon": "icon.png",
   "networkAccess": {
     "allowedDomains": [
       "none"
