@@ -512,7 +512,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string, title?: string }) => {
+figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string, title?: string, desc?: string }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
     return;
@@ -690,6 +690,54 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
         if (item) { item.title = newTitle; if (msg.color) item.color = msg.color; }
         frame.setPluginData('annotationData', JSON.stringify(data));
       } catch (e) { console.error('Failed to persist title update in pluginData', e); }
+    }
+  }
+
+  // Targeted description update: load regular font once, swap Description text node in place
+  // Falls back to full rebuild if desc node needs to be created or removed (empty<->non-empty)
+  if (msg.type === 'update-item-desc' && msg.itemId !== undefined) {
+    let node: BaseNode = (figma.currentPage.selection[0] as BaseNode);
+    while (node && node.type !== 'PAGE') {
+      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
+      node = node.parent as BaseNode;
+    }
+    const frame = node as FrameNode;
+    if (frame && frame.type === 'FRAME' && frame.getPluginData('annotationData')) {
+      const newDesc = msg.desc || '';
+      const itemRow = frame.children.find(
+        c => c.name === 'Item Row' && (c as FrameNode).getPluginData('itemId') === msg.itemId
+      ) as FrameNode | undefined;
+
+      const descText = itemRow?.children.find(c => c.name === 'Description') as TextNode | undefined;
+
+      if (descText && newDesc) {
+        // Non-empty to non-empty: just swap characters
+        await figma.loadFontAsync(FONT_REGULAR);
+        descText.characters = newDesc;
+      } else {
+        // Need to create or remove the Description node — full rebuild
+        try {
+          const data = JSON.parse(frame.getPluginData('annotationData'));
+          const item = data.items.find((i: AnnotationItem) => i.id === msg.itemId);
+          if (item) item.desc = newDesc;
+          isBuildingAnnotation = true;
+          await buildAnnotationContent(frame, data);
+          frame.setPluginData('annotationData', JSON.stringify(data));
+          updateConnector(frame as FrameNode, data);
+          figma.currentPage.selection = [frame];
+          isBuildingAnnotation = false;
+          emitState();
+        } catch (e) { console.error('Failed to rebuild for desc change', e); isBuildingAnnotation = false; }
+        return;
+      }
+
+      // Persist desc change in pluginData
+      try {
+        const data = JSON.parse(frame.getPluginData('annotationData'));
+        const item = data.items.find((i: AnnotationItem) => i.id === msg.itemId);
+        if (item) item.desc = newDesc;
+        frame.setPluginData('annotationData', JSON.stringify(data));
+      } catch (e) { console.error('Failed to persist desc update in pluginData', e); }
     }
   }
 

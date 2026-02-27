@@ -922,8 +922,13 @@
           _editSyncTimer = setTimeout(() => {
             parent.postMessage({ pluginMessage: { type: 'update-item-title', itemId: id, title: value, color: item?.color } }, '*');
           }, 300);
+        } else if (field === 'desc') {
+          // Targeted description update — swaps Description text node in place, no full rebuild
+          _editSyncTimer = setTimeout(() => {
+            parent.postMessage({ pluginMessage: { type: 'update-item-desc', itemId: id, desc: value } }, '*');
+          }, 400);
         } else {
-          // Description and other fields still use the debounced full rebuild
+          // Structural/other fields fall back to full rebuild
           _editSyncTimer = setTimeout(() => saveAnnotation(false), 400);
         }
       }
