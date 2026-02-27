@@ -863,7 +863,10 @@
       state.confirmedItems.add(itemId); // mark as explicitly confirmed after mutation
       updateItemsWithoutLosingFocus(state.items);
       closeTagDropdown(itemId);
-      if (state.mode === 'edit') saveAnnotation(false); // single canvas sync
+      if (state.mode === 'edit') {
+        // Targeted update: change title+color in place, no full rebuild
+        parent.postMessage({ pluginMessage: { type: 'update-item-title', itemId, title: tag.title, color: tag.color } }, '*');
+      }
     };
 
     function renderGlobal() {
@@ -914,7 +917,15 @@
       if (field === 'title') state.confirmedItems.delete(id);
       if (state.mode === 'edit') {
         clearTimeout(_editSyncTimer);
-        _editSyncTimer = setTimeout(() => saveAnnotation(false), 400);
+        if (field === 'title') {
+          // Targeted title update — swaps text node in place, no full rebuild
+          _editSyncTimer = setTimeout(() => {
+            parent.postMessage({ pluginMessage: { type: 'update-item-title', itemId: id, title: value, color: item?.color } }, '*');
+          }, 300);
+        } else {
+          // Description and other fields still use the debounced full rebuild
+          _editSyncTimer = setTimeout(() => saveAnnotation(false), 400);
+        }
       }
     };
 

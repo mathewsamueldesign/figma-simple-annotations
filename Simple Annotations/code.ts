@@ -512,7 +512,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string }) => {
+figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string, title?: string }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
     return;
@@ -637,6 +637,59 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
         if (item) item.color = msg.color;
         frame.setPluginData('annotationData', JSON.stringify(data));
       } catch (e) { console.error('Failed to update annotation color in pluginData', e); }
+    }
+  }
+
+  // Targeted title-only update: load bold font once, swap text in the Title node
+  // Falls back to full rebuild only when badge needs to be created or removed (empty<->non-empty)
+  if (msg.type === 'update-item-title' && msg.itemId !== undefined) {
+    let node: BaseNode = (figma.currentPage.selection[0] as BaseNode);
+    while (node && node.type !== 'PAGE') {
+      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
+      node = node.parent as BaseNode;
+    }
+    const frame = node as FrameNode;
+    if (frame && frame.type === 'FRAME' && frame.getPluginData('annotationData')) {
+      const newTitle = msg.title || '';
+      const itemRow = frame.children.find(
+        c => c.name === 'Item Row' && (c as FrameNode).getPluginData('itemId') === msg.itemId
+      ) as FrameNode | undefined;
+
+      const badge = itemRow?.children.find(c => c.name === 'Title Badge') as FrameNode | undefined;
+      const titleText = badge?.children.find(c => c.name === 'Title') as TextNode | undefined;
+
+      if (badge && titleText && newTitle) {
+        // Non-empty to non-empty: just swap the text in place
+        await figma.loadFontAsync(FONT_BOLD);
+        titleText.characters = newTitle;
+        if (msg.color) {
+          badge.fills = [{ type: 'SOLID', color: hexToRgb(msg.color) }];
+          titleText.fills = [{ type: 'SOLID', color: getContrastTextColor(msg.color) }];
+        }
+      } else {
+        // Badge needs creating or removing — fall back to full rebuild
+        try {
+          const data = JSON.parse(frame.getPluginData('annotationData'));
+          const item = data.items.find((i: AnnotationItem) => i.id === msg.itemId);
+          if (item) { item.title = newTitle; if (msg.color) item.color = msg.color; }
+          isBuildingAnnotation = true;
+          await buildAnnotationContent(frame, data);
+          frame.setPluginData('annotationData', JSON.stringify(data));
+          updateConnector(frame as FrameNode, data);
+          figma.currentPage.selection = [frame];
+          isBuildingAnnotation = false;
+          emitState();
+        } catch (e) { console.error('Failed to rebuild for title change', e); isBuildingAnnotation = false; }
+        return;
+      }
+
+      // Persist in pluginData
+      try {
+        const data = JSON.parse(frame.getPluginData('annotationData'));
+        const item = data.items.find((i: AnnotationItem) => i.id === msg.itemId);
+        if (item) { item.title = newTitle; if (msg.color) item.color = msg.color; }
+        frame.setPluginData('annotationData', JSON.stringify(data));
+      } catch (e) { console.error('Failed to persist title update in pluginData', e); }
     }
   }
 
