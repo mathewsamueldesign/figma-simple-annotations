@@ -645,7 +645,8 @@
         { id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }
       ],
       clientTags: [],
-      documentTags: []
+      documentTags: [],
+      confirmedItems: new Set() // item IDs whose label was explicitly selected/created from dropdown
     };
 
     // Same 3:1 large-text threshold as code.ts — returns 'white' or 'black' for checkmark stroke
@@ -811,7 +812,11 @@
         const createOption = document.createElement('div');
         createOption.className = 'tag-option tag-create-prompt tag-title-text';
         createOption.textContent = `Create "${query}"`;
-        createOption.onclick = () => closeTagDropdown(itemId);
+        createOption.onclick = () => {
+          // Mark this item's label as explicitly confirmed by the user
+          state.confirmedItems.add(itemId);
+          closeTagDropdown(itemId);
+        };
         dropdown.appendChild(createOption);
       }
 
@@ -842,6 +847,7 @@
     };
 
     window.selectTag = (itemId, tag) => {
+      state.confirmedItems.add(itemId); // explicitly chosen from dropdown = confirmed
       updateItem(itemId, 'title', tag.title);
       updateItem(itemId, 'color', tag.color);
       updateItemsWithoutLosingFocus(state.items);
@@ -888,7 +894,9 @@
     window.updateItem = (id, field, value) => {
       const item = state.items.find(i => i.id === id);
       if (item) item[field] = value;
-      if (state.mode === 'edit') saveAnnotation(false); // live sync only, don't commit tags mid-type
+      // Typing a new title manually un-confirms the label — only dropdown picks/Create prompt confirm it
+      if (field === 'title') state.confirmedItems.delete(id);
+      if (state.mode === 'edit') saveAnnotation(false);
     };
 
     window.removeItem = (id) => {
@@ -912,21 +920,17 @@
       }
 
       if (persistTags) {
-        // Update global tags (only personal clientTags)
+        // Only save labels that were explicitly confirmed via dropdown selection or Create prompt.
+        // In edit mode, always save (labels were intentionally used when annotation was first created).
         state.items.forEach(item => {
           const title = item.title.trim();
-          if (title) {
+          if (title && (state.mode === 'edit' || state.confirmedItems.has(item.id))) {
             const existingClientTagIndex = state.clientTags.findIndex(t => t.title.toLowerCase() === title.toLowerCase());
 
             if (existingClientTagIndex > -1) {
-              // Update color if changed
               state.clientTags[existingClientTagIndex].color = item.color;
-              // Also update case if they typed it differently
               state.clientTags[existingClientTagIndex].title = title;
             } else {
-              // Only add to clientTags if they explicitly typed something new that isn't their personal tag.
-              // Even if it exists in documentTags, editing it or saving an annotation utilizing it 
-              // will upgrade it to a personal tag so they can take it with them.
               state.clientTags.push({ title, color: item.color });
             }
           }
@@ -1023,6 +1027,7 @@
           state.matchStroke = false;
           state.connectorColor = '#F24822';
           state.items = [{ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' }];
+          state.confirmedItems.clear();
           renderItems();
         }
         renderGlobal();
