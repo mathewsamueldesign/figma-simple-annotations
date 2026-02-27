@@ -512,7 +512,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string }) => {
+figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
     return;
@@ -604,6 +604,40 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
     updateConnector(frame, payload);
 
     figma.currentPage.selection = [frame];
+  }
+
+  // Targeted color-only update: surgically update badge fills without a full rebuild
+  // No font loading needed — only fills change
+  if (msg.type === 'update-item-color' && msg.itemId && msg.color) {
+    let node: BaseNode = (figma.currentPage.selection[0] as BaseNode);
+    while (node && node.type !== 'PAGE') {
+      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
+      node = node.parent as BaseNode;
+    }
+    const frame = node as FrameNode;
+    if (frame && frame.type === 'FRAME' && frame.getPluginData('annotationData')) {
+      // Find the specific Item Row by itemId
+      const itemRow = frame.children.find(
+        c => c.name === 'Item Row' && (c as FrameNode).getPluginData('itemId') === msg.itemId
+      ) as FrameNode | undefined;
+      if (itemRow) {
+        const badge = itemRow.children.find(c => c.name === 'Title Badge') as FrameNode | undefined;
+        if (badge) {
+          badge.fills = [{ type: 'SOLID', color: hexToRgb(msg.color) }];
+          const titleText = badge.children.find(c => c.name === 'Title') as TextNode | undefined;
+          if (titleText) {
+            titleText.fills = [{ type: 'SOLID', color: getContrastTextColor(msg.color) }];
+          }
+        }
+      }
+      // Persist the color change in pluginData
+      try {
+        const data = JSON.parse(frame.getPluginData('annotationData'));
+        const item = data.items.find((i: AnnotationItem) => i.id === msg.itemId);
+        if (item) item.color = msg.color;
+        frame.setPluginData('annotationData', JSON.stringify(data));
+      } catch (e) { console.error('Failed to update annotation color in pluginData', e); }
+    }
   }
 
   if (msg.type === 'update-annotation' && msg.data) {

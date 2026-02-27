@@ -711,8 +711,14 @@
         const thisTextarea = document.getElementById(`desc-${item.id}`);
         if (thisTextarea) autoResize(thisTextarea);
         renderColorSwatches(document.getElementById(`colors-${item.id}`), item.color, (newColor) => {
-          updateItem(item.id, 'color', newColor);
-          updateItemsWithoutLosingFocus(state.items); // Smart re-render!
+          // Update state immediately
+          const it = state.items.find(i => i.id === item.id);
+          if (it) it.color = newColor;
+          if (state.mode === 'edit') {
+            // Targeted color update — no full rebuild needed, no font loading
+            parent.postMessage({ pluginMessage: { type: 'update-item-color', itemId: item.id, color: newColor } }, '*');
+          }
+          updateItemsWithoutLosingFocus(state.items); // re-render checkmark
         });
       });
     }
