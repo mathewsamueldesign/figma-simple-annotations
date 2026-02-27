@@ -528,6 +528,18 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
     return;
   }
 
+  // Helper: find the annotation frame from the current selection (parent traversal)
+  function getAnnotationFrame(): FrameNode | null {
+    const sel = figma.currentPage.selection;
+    if (!sel.length) return null;
+    let node: BaseNode = sel[0];
+    while (node && node.type !== 'PAGE') {
+      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) return node as FrameNode;
+      node = node.parent as BaseNode;
+    }
+    return null;
+  }
+
   if (msg.type === 'create-annotation' && msg.data) {
     const selection = figma.currentPage.selection;
     if (selection.length !== 1) {
@@ -609,12 +621,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
   // Targeted color-only update: surgically update badge fills without a full rebuild
   // No font loading needed — only fills change
   if (msg.type === 'update-item-color' && msg.itemId && msg.color) {
-    let node: BaseNode = (figma.currentPage.selection[0] as BaseNode);
-    while (node && node.type !== 'PAGE') {
-      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
-      node = node.parent as BaseNode;
-    }
-    const frame = node as FrameNode;
+    const frame = getAnnotationFrame();
     if (frame && frame.type === 'FRAME' && frame.getPluginData('annotationData')) {
       // Find the specific Item Row by itemId
       const itemRow = frame.children.find(
@@ -643,12 +650,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
   // Targeted title-only update: load bold font once, swap text in the Title node
   // Falls back to full rebuild only when badge needs to be created or removed (empty<->non-empty)
   if (msg.type === 'update-item-title' && msg.itemId !== undefined) {
-    let node: BaseNode = (figma.currentPage.selection[0] as BaseNode);
-    while (node && node.type !== 'PAGE') {
-      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
-      node = node.parent as BaseNode;
-    }
-    const frame = node as FrameNode;
+    const frame = getAnnotationFrame();
     if (frame && frame.type === 'FRAME' && frame.getPluginData('annotationData')) {
       const newTitle = msg.title || '';
       const itemRow = frame.children.find(
@@ -696,12 +698,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
   // Targeted description update: load regular font once, swap Description text node in place
   // Falls back to full rebuild if desc node needs to be created or removed (empty<->non-empty)
   if (msg.type === 'update-item-desc' && msg.itemId !== undefined) {
-    let node: BaseNode = (figma.currentPage.selection[0] as BaseNode);
-    while (node && node.type !== 'PAGE') {
-      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
-      node = node.parent as BaseNode;
-    }
-    const frame = node as FrameNode;
+    const frame = getAnnotationFrame();
     if (frame && frame.type === 'FRAME' && frame.getPluginData('annotationData')) {
       const newDesc = msg.desc || '';
       const itemRow = frame.children.find(
@@ -742,16 +739,8 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
   }
 
   // Helper: find the annotation frame from the current selection (parent traversal)
-  function getAnnotationFrame(): FrameNode | null {
-    const sel = figma.currentPage.selection;
-    if (!sel.length) return null;
-    let node: BaseNode = sel[0];
-    while (node && node.type !== 'PAGE') {
-      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) return node as FrameNode;
-      node = node.parent as BaseNode;
-    }
-    return null;
-  }
+  // (Note: This helper is now defined at the top of onmessage)
+
 
   // Targeted connector color update: only touch line strokes + dot fills (+ frame border if matchStroke)
   if (msg.type === 'update-connector-color' && msg.color) {
@@ -817,21 +806,8 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
   }
 
   if (msg.type === 'update-annotation' && msg.data) {
-    const selection = figma.currentPage.selection;
-    if (selection.length !== 1) {
-      figma.notify("Lost selection. Please re-select the annotation.");
-      return;
-    }
-
-    // Walk up the parent chain to find the annotation frame,
-    // allowing edits when a child element is selected (e.g. a badge or text node)
-    let node: BaseNode = selection[0];
-    while (node && node.type !== 'PAGE') {
-      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
-      node = node.parent as BaseNode;
-    }
-    const frame = node as FrameNode;
-    if (!frame || frame.type !== 'FRAME' || !frame.getPluginData('annotationData')) {
+    const frame = getAnnotationFrame();
+    if (!frame) {
       figma.notify("Selected node is not an editable annotation.");
       return;
     }
