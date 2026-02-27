@@ -530,7 +530,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
 
     const targetNode = selection[0];
     const frame = figma.createFrame();
-    frame.name = `${targetNode.name} Annotation`;
+    frame.name = targetNode.name;
 
     await buildAnnotationContent(frame, msg.data);
 
