@@ -606,8 +606,15 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
       return;
     }
 
-    const frame = selection[0];
-    if (frame.type !== 'FRAME' || !frame.getPluginData('annotationData')) {
+    // Walk up the parent chain to find the annotation frame,
+    // allowing edits when a child element is selected (e.g. a badge or text node)
+    let node: BaseNode = selection[0];
+    while (node && node.type !== 'PAGE') {
+      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) break;
+      node = node.parent as BaseNode;
+    }
+    const frame = node as FrameNode;
+    if (!frame || frame.type !== 'FRAME' || !frame.getPluginData('annotationData')) {
       figma.notify("Selected node is not an editable annotation.");
       return;
     }
