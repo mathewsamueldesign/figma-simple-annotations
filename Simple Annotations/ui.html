@@ -847,11 +847,17 @@
     };
 
     window.selectTag = (itemId, tag) => {
-      state.confirmedItems.add(itemId); // explicitly chosen from dropdown = confirmed
-      updateItem(itemId, 'title', tag.title);
-      updateItem(itemId, 'color', tag.color);
+      // Directly update state to avoid triggering two canvas syncs (one per updateItem call)
+      // and to prevent updateItem's confirmedItems.delete from undoing our confirmation
+      const item = state.items.find(i => i.id === itemId);
+      if (item) {
+        item.title = tag.title;
+        item.color = tag.color;
+      }
+      state.confirmedItems.add(itemId); // mark as explicitly confirmed after mutation
       updateItemsWithoutLosingFocus(state.items);
       closeTagDropdown(itemId);
+      if (state.mode === 'edit') saveAnnotation(false); // single canvas sync
     };
 
     function renderGlobal() {
