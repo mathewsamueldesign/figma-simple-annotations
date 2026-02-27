@@ -696,7 +696,7 @@
           <div class="input-wrapper ${hasTags ? 'has-tags' : ''}">
             <input type="text" placeholder="Short Label (e.g. SEO)" value="${item.title}" 
                    oninput="updateItem('${item.id}', 'title', this.value); filterTags('${item.id}', this.value)"
-                   onfocus="filterTags('${item.id}', this.value)"
+                   onfocus="filterTags('${item.id}', '')"
                    onblur="setTimeout(() => closeTagDropdown('${item.id}'), 200)" />
             ${hasTags ? `
             <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
