@@ -888,55 +888,58 @@
     window.updateItem = (id, field, value) => {
       const item = state.items.find(i => i.id === id);
       if (item) item[field] = value;
-      if (state.mode === 'edit') saveAnnotation();
+      if (state.mode === 'edit') saveAnnotation(false); // live sync only, don't commit tags mid-type
     };
 
     window.removeItem = (id) => {
       state.items = state.items.filter(i => i.id !== id);
       renderItems();
-      if (state.mode === 'edit') saveAnnotation();
+      if (state.mode === 'edit') saveAnnotation(true); // removing a note is a deliberate action
     };
 
     document.getElementById('add-item').onclick = () => {
       state.items.push({ id: Date.now().toString(), title: '', desc: '', color: '#18A0FB' });
       renderItems();
-      if (state.mode === 'edit') saveAnnotation();
+      if (state.mode === 'edit') saveAnnotation(false); // adding a note is structural, not a tag commit
     };
 
-    function saveAnnotation() {
+    // persistTags: only commit labels to clientTags on explicit/final saves, not live keystroke syncs
+    function saveAnnotation(persistTags = true) {
       const hasContent = state.items.some(i => i.title.trim() || i.desc.trim());
       if (!hasContent && state.mode !== 'edit') {
         parent.postMessage({ pluginMessage: { type: 'notify', message: 'Please enter at least one annotation.' } }, '*');
         return;
       }
 
-      // Update global tags (only personal clientTags)
-      state.items.forEach(item => {
-        const title = item.title.trim();
-        if (title) {
-          const existingClientTagIndex = state.clientTags.findIndex(t => t.title.toLowerCase() === title.toLowerCase());
+      if (persistTags) {
+        // Update global tags (only personal clientTags)
+        state.items.forEach(item => {
+          const title = item.title.trim();
+          if (title) {
+            const existingClientTagIndex = state.clientTags.findIndex(t => t.title.toLowerCase() === title.toLowerCase());
 
-          if (existingClientTagIndex > -1) {
-            // Update color if changed
-            state.clientTags[existingClientTagIndex].color = item.color;
-            // Also update case if they typed it differently
-            state.clientTags[existingClientTagIndex].title = title;
-          } else {
-            // Only add to clientTags if they explicitly typed something new that isn't their personal tag.
-            // Even if it exists in documentTags, editing it or saving an annotation utilizing it 
-            // will upgrade it to a personal tag so they can take it with them.
-            state.clientTags.push({ title, color: item.color });
+            if (existingClientTagIndex > -1) {
+              // Update color if changed
+              state.clientTags[existingClientTagIndex].color = item.color;
+              // Also update case if they typed it differently
+              state.clientTags[existingClientTagIndex].title = title;
+            } else {
+              // Only add to clientTags if they explicitly typed something new that isn't their personal tag.
+              // Even if it exists in documentTags, editing it or saving an annotation utilizing it 
+              // will upgrade it to a personal tag so they can take it with them.
+              state.clientTags.push({ title, color: item.color });
+            }
           }
-        }
-      });
+        });
 
-      // Send tags to backend to persist
-      parent.postMessage({
-        pluginMessage: {
-          type: 'save-tags',
-          data: state.clientTags
-        }
-      }, '*');
+        // Send tags to backend to persist
+        parent.postMessage({
+          pluginMessage: {
+            type: 'save-tags',
+            data: state.clientTags
+          }
+        }, '*');
+      }
 
       const payload = {
         theme: state.theme,
@@ -1041,9 +1044,10 @@
     // Wire save-btn once — reads state.mode at call time
     document.getElementById('save-btn').onclick = () => {
       if (state.mode === 'edit') {
+        saveAnnotation(true); // commit tags on Done before closing
         parent.postMessage({ pluginMessage: { type: 'close-plugin' } }, '*');
       } else {
-        saveAnnotation();
+        saveAnnotation(); // persistTags defaults to true for Create
       }
     };
   </script>
