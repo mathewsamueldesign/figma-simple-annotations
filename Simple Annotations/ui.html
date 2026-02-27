@@ -897,12 +897,19 @@
       if (state.mode === 'edit') saveAnnotation();
     };
 
+    // Debounce timer for live canvas sync — prevents concurrent async buildAnnotationContent calls
+    // that cause annotation content to be duplicated or cleared when typing rapidly
+    let _editSyncTimer = null;
+
     window.updateItem = (id, field, value) => {
       const item = state.items.find(i => i.id === id);
       if (item) item[field] = value;
       // Typing a new title manually un-confirms the label — only dropdown picks/Create prompt confirm it
       if (field === 'title') state.confirmedItems.delete(id);
-      if (state.mode === 'edit') saveAnnotation(false);
+      if (state.mode === 'edit') {
+        clearTimeout(_editSyncTimer);
+        _editSyncTimer = setTimeout(() => saveAnnotation(false), 400);
+      }
     };
 
     window.removeItem = (id) => {
@@ -1054,12 +1061,8 @@
 
     // Wire save-btn once — reads state.mode at call time
     document.getElementById('save-btn').onclick = () => {
-      if (state.mode === 'edit') {
-        saveAnnotation(true); // commit tags on Done before closing
-        parent.postMessage({ pluginMessage: { type: 'close-plugin' } }, '*');
-      } else {
-        saveAnnotation(); // persistTags defaults to true for Create
-      }
+      clearTimeout(_editSyncTimer); // cancel any pending debounced sync before final save
+      saveAnnotation(true); // works for both create and edit modes; plugin stays open
     };
   </script>
 </body>
