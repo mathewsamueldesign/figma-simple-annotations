@@ -130,8 +130,15 @@ async function emitState() {
   figma.ui.postMessage({ type: 'set-state', mode: 'create', clientTags, documentTags });
 }
 
+// Guard to suppress selectionchange events during annotation rebuild
+// (removing/re-adding children causes spurious empty-selection events)
+let isBuildingAnnotation = false;
+
 // Check selection and update UI state
-figma.on('selectionchange', emitState);
+figma.on('selectionchange', () => {
+  if (isBuildingAnnotation) return;
+  emitState();
+});
 
 // Trigger initial state on plugin launch
 emitState();
@@ -630,11 +637,14 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string })
       } catch (e) { console.error('Failed to parse existing annotation data during update', e); }
     }
 
+    isBuildingAnnotation = true;
     await buildAnnotationContent(frame, msg.data);
     frame.setPluginData('annotationData', JSON.stringify(msg.data));
     updateConnector(frame as FrameNode, msg.data);
-    // Re-select the annotation frame — child elements are removed/re-added during rebuild
-    // so the previous child selection is lost; this keeps the plugin in edit mode
+    // Restore selection to the annotation frame (child nodes were destroyed during rebuild)
     figma.currentPage.selection = [frame];
+    isBuildingAnnotation = false;
+    // Manually emit state once with the correct selection
+    emitState();
   }
 };
