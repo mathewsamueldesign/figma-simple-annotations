@@ -512,7 +512,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string, title?: string, desc?: string }) => {
+figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string, title?: string, desc?: string, theme?: string, matchStroke?: boolean }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
     return;
@@ -738,6 +738,81 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
         if (item) item.desc = newDesc;
         frame.setPluginData('annotationData', JSON.stringify(data));
       } catch (e) { console.error('Failed to persist desc update in pluginData', e); }
+    }
+  }
+
+  // Helper: find the annotation frame from the current selection (parent traversal)
+  function getAnnotationFrame(): FrameNode | null {
+    const sel = figma.currentPage.selection;
+    if (!sel.length) return null;
+    let node: BaseNode = sel[0];
+    while (node && node.type !== 'PAGE') {
+      if (node.type === 'FRAME' && (node as FrameNode).getPluginData('annotationData')) return node as FrameNode;
+      node = node.parent as BaseNode;
+    }
+    return null;
+  }
+
+  // Targeted connector color update: only touch line strokes + dot fills (+ frame border if matchStroke)
+  if (msg.type === 'update-connector-color' && msg.color) {
+    const frame = getAnnotationFrame();
+    if (frame) {
+      try {
+        const data = JSON.parse(frame.getPluginData('annotationData'));
+        data.connectorColor = msg.color;
+        const line = frame.children.find(c => c.name === '\u21b3 Connector Line') as VectorNode | undefined;
+        const dot = frame.children.find(c => c.name === 'Connector End') as EllipseNode | undefined;
+        if (line) line.strokes = [{ type: 'SOLID', color: hexToRgb(msg.color) }];
+        if (dot) dot.fills = [{ type: 'SOLID', color: hexToRgb(msg.color) }];
+        if (data.matchStroke) frame.strokes = [{ type: 'SOLID', color: hexToRgb(msg.color) }];
+        frame.setPluginData('annotationData', JSON.stringify(data));
+      } catch (e) { console.error('Failed to update connector color', e); }
+    }
+  }
+
+  // Targeted border toggle: only flip the frame stroke
+  if (msg.type === 'update-match-stroke' && msg.matchStroke !== undefined) {
+    const frame = getAnnotationFrame();
+    if (frame) {
+      try {
+        const data = JSON.parse(frame.getPluginData('annotationData'));
+        data.matchStroke = msg.matchStroke;
+        const isLight = data.theme === 'light';
+        if (msg.matchStroke) {
+          frame.strokes = [{ type: 'SOLID', color: hexToRgb(data.connectorColor) }];
+        } else {
+          frame.strokes = [{ type: 'SOLID', color: hexToRgb(isLight ? '#E5E5E5' : '#333333') }];
+        }
+        frame.setPluginData('annotationData', JSON.stringify(data));
+      } catch (e) { console.error('Failed to update border', e); }
+    }
+  }
+
+  // Targeted theme update: flip bg + border + description text colors — no font loading needed
+  if (msg.type === 'update-theme' && msg.theme) {
+    const frame = getAnnotationFrame();
+    if (frame) {
+      try {
+        const data = JSON.parse(frame.getPluginData('annotationData'));
+        data.theme = msg.theme;
+        const isLight = msg.theme === 'light';
+        frame.fills = [{ type: 'SOLID', color: hexToRgb(isLight ? '#FFFFFF' : '#1C1C1E') }];
+        if (data.matchStroke) {
+          frame.strokes = [{ type: 'SOLID', color: hexToRgb(data.connectorColor) }];
+        } else {
+          frame.strokes = [{ type: 'SOLID', color: hexToRgb(isLight ? '#E5E5E5' : '#333333') }];
+        }
+        // Update description text color for each item row
+        const descColor = hexToRgb(isLight ? '#444444' : '#E0E0E0');
+        frame.children.forEach(child => {
+          if (child.name === 'Item Row') {
+            const row = child as FrameNode;
+            const descText = row.children.find(c => c.name === 'Description') as TextNode | undefined;
+            if (descText) descText.fills = [{ type: 'SOLID', color: descColor }];
+          }
+        });
+        frame.setPluginData('annotationData', JSON.stringify(data));
+      } catch (e) { console.error('Failed to update theme', e); }
     }
   }
 

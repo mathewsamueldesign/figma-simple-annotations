@@ -882,7 +882,9 @@
         (color) => {
           state.connectorColor = color;
           renderGlobal();
-          if (state.mode === 'edit') saveAnnotation();
+          if (state.mode === 'edit') {
+            parent.postMessage({ pluginMessage: { type: 'update-connector-color', color } }, '*');
+          }
         }
       );
 
@@ -897,13 +899,17 @@
     window.toggleTheme = () => {
       state.theme = state.theme === 'dark' ? 'light' : 'dark';
       renderGlobal();
-      if (state.mode === 'edit') saveAnnotation();
+      if (state.mode === 'edit') {
+        parent.postMessage({ pluginMessage: { type: 'update-theme', theme: state.theme } }, '*');
+      }
     };
 
     // Actions
     window.toggleMatchStroke = (checked) => {
       state.matchStroke = checked;
-      if (state.mode === 'edit') saveAnnotation();
+      if (state.mode === 'edit') {
+        parent.postMessage({ pluginMessage: { type: 'update-match-stroke', matchStroke: checked } }, '*');
+      }
     };
 
     // Debounce timer for live canvas sync — prevents concurrent async buildAnnotationContent calls
