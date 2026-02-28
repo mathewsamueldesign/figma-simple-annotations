@@ -147,6 +147,7 @@ emitState();
 // Figma requires loadAllPagesAsync before registering documentchange
 (async () => {
   await figma.loadAllPagesAsync();
+  // eslint-disable-next-line @figma/figma-plugins/dynamic-page-documentchange-event-advice
   figma.on('documentchange', (event) => {
     let needsUpdate = false;
     for (const change of event.documentChanges) {
@@ -253,8 +254,8 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     if (dot) dot.visible = true;
 
     // Destroy stray ConnectorNode if we previously generated one by accident
-    if (line && (line as any).type === 'CONNECTOR') { line.remove(); line = null; }
-    if (dot && (dot as any).type === 'CONNECTOR') { dot.remove(); dot = null; }
+    if (line && (line as unknown as ConnectorNode).type === 'CONNECTOR') { line.remove(); line = null; }
+    if (dot && (dot as unknown as ConnectorNode).type === 'CONNECTOR') { dot.remove(); dot = null; }
 
     const targetBounds = targetNode.absoluteBoundingBox;
     const frameBounds = frame.absoluteBoundingBox;
@@ -266,7 +267,7 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     const fCenterY = frameBounds.y + frameBounds.height / 2;
 
     let startX = 0, startY = 0, endX = 0, endY = 0;
-    let isHorizontal = Math.abs(tCenterX - fCenterX) > Math.abs(tCenterY - fCenterY);
+    const isHorizontal = Math.abs(tCenterX - fCenterX) > Math.abs(tCenterY - fCenterY);
 
     const SNAP_THRESHOLD = 16;
     let isSnapped = false;
@@ -321,7 +322,7 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     const pEndY = lEndY - minY;
 
     // We want the 'bus' elbows to run completely outside the parent container (e.g. the main artboard)
-    let topParent = getTopLevelFrame(targetNode);
+    const topParent = getTopLevelFrame(targetNode);
     const parentBounds = 'absoluteBoundingBox' in topParent ? topParent.absoluteBoundingBox : null;
 
     const allFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
@@ -512,7 +513,7 @@ async function buildAnnotationContent(parentFrame: FrameNode, data: AnnotationDa
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, itemId?: string, color?: string, title?: string, desc?: string, theme?: string, matchStroke?: boolean }) => {
+figma.ui.onmessage = async (msg: { type: string, data?: unknown, message?: string, itemId?: string, color?: string, title?: string, desc?: string, theme?: string, matchStroke?: boolean }) => {
   if (msg.type === 'notify' && msg.message) {
     figma.notify(msg.message);
     return;
@@ -524,7 +525,7 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
   }
 
   if (msg.type === 'save-tags' && msg.data) {
-    await figma.clientStorage.setAsync('savedTags', JSON.stringify(msg.data));
+    await figma.clientStorage.setAsync('savedTags', JSON.stringify(msg.data as { title: string, color: string }[]));
     return;
   }
 
@@ -551,14 +552,15 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
     const frame = figma.createFrame();
     frame.name = targetNode.name;
 
-    await buildAnnotationContent(frame, msg.data);
+    const annotationData = msg.data as AnnotationData;
+    await buildAnnotationContent(frame, annotationData);
 
     // Save data state
-    const payload = { ...msg.data, targetNodeId: targetNode.id };
+    const payload = { ...annotationData, targetNodeId: targetNode.id };
     frame.setPluginData('annotationData', JSON.stringify(payload));
 
     // Positioning Logic
-    let topParent = getTopLevelFrame(targetNode);
+    const topParent = getTopLevelFrame(targetNode);
     const targetBounds = targetNode.absoluteBoundingBox;
     const parentBounds = 'absoluteBoundingBox' in topParent ? topParent.absoluteBoundingBox : null;
 
@@ -812,21 +814,23 @@ figma.ui.onmessage = async (msg: { type: string, data?: any, message?: string, i
       return;
     }
 
+    const updateData = msg.data as AnnotationData;
+
     // Retain original targetNodeId
     const existingDataStr = frame.getPluginData('annotationData');
     if (existingDataStr) {
       try {
         const existingData = JSON.parse(existingDataStr);
         if (existingData.targetNodeId) {
-          msg.data.targetNodeId = existingData.targetNodeId;
+          updateData.targetNodeId = existingData.targetNodeId;
         }
       } catch (e) { console.error('Failed to parse existing annotation data during update', e); }
     }
 
     isBuildingAnnotation = true;
-    await buildAnnotationContent(frame, msg.data);
-    frame.setPluginData('annotationData', JSON.stringify(msg.data));
-    updateConnector(frame as FrameNode, msg.data);
+    await buildAnnotationContent(frame, updateData);
+    frame.setPluginData('annotationData', JSON.stringify(updateData));
+    updateConnector(frame as FrameNode, updateData);
     // Restore selection to the annotation frame (child nodes were destroyed during rebuild)
     figma.currentPage.selection = [frame];
     isBuildingAnnotation = false;

@@ -1,5 +1,5 @@
 {
-  "name": "Simple-Annotations",
+  "name": "simple-annotations",
   "version": "1.0.0",
   "description": "Clean, structured annotation notes for Figma elements with automatic connectors.",
   "main": "code.js",
