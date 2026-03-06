@@ -49,8 +49,15 @@ function getTopLevelFrame(node: BaseNode): BaseNode {
   return topParent;
 }
 
+// Short-lived cache for getTagsData so rapid selectionchange bursts (e.g. during drags)
+// don't hammer clientStorage and findAllWithCriteria on every event.
+let _tagsCache: { clientTags: { title: string, color: string }[], documentTags: { title: string, color: string }[] } | null = null;
+let _tagsCacheTimer: ReturnType<typeof setTimeout> | null = null;
+
 // Fetch tags: clientStorage (personal) vs scanning the current page (document)
 async function getTagsData() {
+  if (_tagsCache) return _tagsCache;
+
   const clientTagsStr = await figma.clientStorage.getAsync('savedTags');
   const clientTags: { title: string, color: string }[] = clientTagsStr ? JSON.parse(clientTagsStr) : [];
 
@@ -76,7 +83,11 @@ async function getTagsData() {
   }
 
   const documentTags = Array.from(docMap.values());
-  return { clientTags, documentTags };
+  _tagsCache = { clientTags, documentTags };
+  // Invalidate cache after 500 ms so a settled selection always gets fresh data
+  if (_tagsCacheTimer) clearTimeout(_tagsCacheTimer);
+  _tagsCacheTimer = setTimeout(() => { _tagsCache = null; }, 500);
+  return _tagsCache;
 }
 
 async function emitState() {
@@ -147,17 +158,24 @@ emitState();
 // Figma requires loadAllPagesAsync before registering documentchange
 (async () => {
   await figma.loadAllPagesAsync();
+
+  // Debounce state: connector redraws are deferred until 150 ms after the drag settles.
+  // This avoids running O(N) async work on every animation frame of a drag.
+  let _positionUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+  let _pendingPositionUpdate = false;
+
   // eslint-disable-next-line @figma/figma-plugins/dynamic-page-documentchange-event-advice
   figma.on('documentchange', (event) => {
-    let needsUpdate = false;
     for (const change of event.documentChanges) {
       if (change.type === 'PROPERTY_CHANGE' && change.properties) {
         const p = change.properties;
+
+        // Flag position/size changes for the debounced connector update
         if (p.indexOf('x') !== -1 || p.indexOf('y') !== -1 || p.indexOf('width') !== -1 || p.indexOf('height') !== -1) {
-          needsUpdate = true;
+          _pendingPositionUpdate = true;
         }
 
-        // Handle Manual Text Edits mapping back to Plugin Data
+        // Handle Manual Text Edits mapping back to Plugin Data — runs immediately (no debounce)
         if (p.indexOf('characters') !== -1 && change.node.type === 'TEXT') {
           const textNode = change.node as TextNode;
           if (textNode.name === 'Title' || textNode.name === 'Description') {
@@ -206,7 +224,7 @@ emitState();
                     // If this frame is currently selected, update the full UI state
                     const selection = figma.currentPage.selection;
                     if (selection.length === 1 && selection[0].id === annotationFrame.id) {
-                      emitState(); // emitState is async and includes clientTags + documentTags
+                      emitState();
                     }
                   }
                 } catch (e) { console.error('Failed to sync text change to plugin data', e); }
@@ -216,26 +234,53 @@ emitState();
         }
       }
     }
-    if (needsUpdate) {
-      const annotationFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
-      for (const frame of annotationFrames) {
-        if (frame.type === 'FRAME') {
-          const dataStr = frame.getPluginData('annotationData');
-          if (dataStr) {
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.targetNodeId) {
-                updateConnector(frame as FrameNode, data);
-              }
-            } catch (e) { console.error('Failed to update connector after document change', e); }
+
+    // Debounced connector redraw: fires once, 150 ms after the last position-change event.
+    // A single findAllWithCriteria call fetches all frames; stagger indices are computed
+    // here so updateConnector doesn't need its own redundant page scan.
+    if (_pendingPositionUpdate) {
+      if (_positionUpdateTimer) clearTimeout(_positionUpdateTimer);
+      _positionUpdateTimer = setTimeout(() => {
+        _pendingPositionUpdate = false;
+        _positionUpdateTimer = null;
+
+        const annotationFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
+        const totalFrames = annotationFrames.length;
+
+        // Pre-sort once for horizontal stagger (by y) and vertical stagger (by x).
+        // updateConnector receives its pre-computed index so it never has to scan again.
+        const sortedByY = [...annotationFrames].sort((a, b) => a.y - b.y);
+        const sortedByX = [...annotationFrames].sort((a, b) => a.x - b.x);
+
+        for (const frame of annotationFrames) {
+          if (frame.type === 'FRAME') {
+            const dataStr = frame.getPluginData('annotationData');
+            if (dataStr) {
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.targetNodeId) {
+                  const frameIndexByY = sortedByY.findIndex(f => f.id === frame.id);
+                  const frameIndexByX = sortedByX.findIndex(f => f.id === frame.id);
+                  updateConnector(frame as FrameNode, data, frameIndexByY, frameIndexByX, totalFrames);
+                }
+              } catch (e) { console.error('Failed to update connector after document change', e); }
+            }
           }
         }
-      }
+      }, 150);
     }
   });
 })();
 
-async function updateConnector(frame: FrameNode, data: AnnotationData) {
+// frameIndexByY / frameIndexByX: caller pre-sorts once and passes the index in,
+// so updateConnector never needs to do its own findAllWithCriteria page scan.
+async function updateConnector(
+  frame: FrameNode,
+  data: AnnotationData,
+  frameIndexByY = 0,
+  frameIndexByX = 0,
+  totalFrames = 1
+) {
   try {
     if (!data.targetNodeId) return;
     const targetNode = await figma.getNodeByIdAsync(data.targetNodeId) as SceneNode;
@@ -325,16 +370,13 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
     const topParent = getTopLevelFrame(targetNode);
     const parentBounds = 'absoluteBoundingBox' in topParent ? topParent.absoluteBoundingBox : null;
 
-    const allFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
-
+    // Stagger offsets use pre-computed indices passed in from the caller.
+    // No findAllWithCriteria call needed here.
     let pathData;
     if (isSnapped) {
       pathData = `M ${pStartX} ${pStartY} L ${pEndX} ${pEndY}`;
     } else if (isHorizontal) {
-      allFrames.sort((a, b) => a.y - b.y);
-      const frameIndex = allFrames.findIndex(f => f.id === frame.id);
-
-      const invertedIndex = Math.max(0, allFrames.length - 1 - frameIndex);
+      const invertedIndex = Math.max(0, totalFrames - 1 - frameIndexByY);
       const staggerOffset = invertedIndex * 12;
 
       let midX;
@@ -353,10 +395,7 @@ async function updateConnector(frame: FrameNode, data: AnnotationData) {
 
       pathData = `M ${pStartX} ${pStartY} L ${midX} ${pStartY} L ${midX} ${pEndY} L ${pEndX} ${pEndY}`;
     } else {
-      allFrames.sort((a, b) => a.x - b.x);
-      const frameIndex = allFrames.findIndex(f => f.id === frame.id);
-
-      const invertedIndex = Math.max(0, allFrames.length - 1 - frameIndex);
+      const invertedIndex = Math.max(0, totalFrames - 1 - frameIndexByX);
       const staggerOffset = invertedIndex * 12;
 
       let midY;
