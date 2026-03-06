@@ -1,0 +1,1 @@
+async function testPerf() { const start = Date.now(); const frames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } }); console.log('Found ' + frames.length + ' frames in ' + (Date.now() - start) + 'ms'); }  

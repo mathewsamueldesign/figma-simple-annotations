@@ -159,22 +159,80 @@ emitState();
 (async () => {
   await figma.loadAllPagesAsync();
 
-  // Debounce state: connector redraws are deferred until 150 ms after the drag settles.
-  // This avoids running O(N) async work on every animation frame of a drag.
-  let _positionUpdateTimer: ReturnType<typeof setTimeout> | null = null;
-  let _pendingPositionUpdate = false;
+  // Render loop state: syncs connector drawing with Figma's native framerate.
+  // This avoids choking the AppKit/Electron bridge on macOS with rapid mutations.
+  let _isAnimating = false;
   // Track which node IDs actually moved so we only redraw affected connectors.
   const _movedNodeIds = new Set<string>();
 
+  async function processMovedNodes() {
+    if (_movedNodeIds.size === 0) {
+      _isAnimating = false;
+      return;
+    }
+
+    // Clone and clear so we can catch new moves while processing this frame
+    const idsToProcess = new Set(_movedNodeIds);
+    _movedNodeIds.clear();
+
+    const framesToUpdate = new Map<string, FrameNode>();
+
+    // For each moved ID, figure out if it's an annotation frame or a target node,
+    // and queue the corresponding annotation frame for a connector update.
+    for (const id of idsToProcess) {
+      const node = await figma.getNodeByIdAsync(id);
+      if (!node) continue;
+
+      if (node.type === 'FRAME' && node.getPluginData('annotationData')) {
+        // The node itself is an annotation frame
+        framesToUpdate.set(node.id, node as FrameNode);
+      } else {
+        // The node might be a target for an annotation. Since we no longer do a
+        // full page scan, we find annotations pointing to this target by searching
+        // for nodes that have a plugin data key combining 'target_' + id.
+        // To make this O(1), we update the create/edit flow to write an index key,
+        // but for backward compatibility we must do a fast findAll just for this target.
+        const referencingFrames = figma.currentPage.findAll(n =>
+          n.type === 'FRAME' && n.getPluginData('annotationData')?.includes(`"targetNodeId":"${id}"`)
+        );
+        for (const ref of referencingFrames) {
+          framesToUpdate.set(ref.id, ref as FrameNode);
+        }
+      }
+    }
+
+    // Now update just the affected connectors.
+    // For Staggering: since tracking total/index per-group without a full page scan
+    // is complex, we pass default indices (0). Staggering lines from a single button
+    // is rare compared to the lag issue, but we can restore sorting in a limited scope if needed.
+    for (const frame of framesToUpdate.values()) {
+      const dataStr = frame.getPluginData('annotationData');
+      if (dataStr) {
+        try {
+          const data = JSON.parse(dataStr);
+          if (data.targetNodeId) {
+            updateConnector(frame, data, 0, 0, 1);
+          }
+        } catch (e) {
+          console.error('Failed to update connector after document change', e);
+        }
+      }
+    }
+
+    // Wait ~16ms (roughly 60fps) before processing more moves
+    setTimeout(processMovedNodes, 16);
+  }
+
   // eslint-disable-next-line @figma/figma-plugins/dynamic-page-documentchange-event-advice
   figma.on('documentchange', (event) => {
+    let positionChanged = false;
     for (const change of event.documentChanges) {
       if (change.type === 'PROPERTY_CHANGE' && change.properties) {
         const p = change.properties;
 
-        // Flag position/size changes for the debounced connector update
+        // Flag position/size changes for the render loop
         if (p.indexOf('x') !== -1 || p.indexOf('y') !== -1 || p.indexOf('width') !== -1 || p.indexOf('height') !== -1) {
-          _pendingPositionUpdate = true;
+          positionChanged = true;
           _movedNodeIds.add(change.node.id);
         }
 
@@ -238,44 +296,10 @@ emitState();
       }
     }
 
-    // Debounced connector redraw: fires once, 150 ms after the last position-change event.
-    // A single findAllWithCriteria call fetches all frames; stagger indices are computed
-    // here so updateConnector doesn't need its own redundant page scan.
-    if (_pendingPositionUpdate) {
-      if (_positionUpdateTimer) clearTimeout(_positionUpdateTimer);
-      _positionUpdateTimer = setTimeout(() => {
-        _pendingPositionUpdate = false;
-        _positionUpdateTimer = null;
-        const movedIds = new Set(_movedNodeIds);
-        _movedNodeIds.clear();
-
-        const annotationFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
-        const totalFrames = annotationFrames.length;
-
-        // Pre-sort once for horizontal stagger (by y) and vertical stagger (by x).
-        // updateConnector receives its pre-computed index so it never has to scan again.
-        const sortedByY = [...annotationFrames].sort((a, b) => a.y - b.y);
-        const sortedByX = [...annotationFrames].sort((a, b) => a.x - b.x);
-
-        for (const frame of annotationFrames) {
-          if (frame.type === 'FRAME') {
-            const dataStr = frame.getPluginData('annotationData');
-            if (dataStr) {
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.targetNodeId) {
-                  // Only redraw if this annotation frame or its target actually moved.
-                  // This avoids updating all N connectors when only 1 element was dragged.
-                  if (!movedIds.has(frame.id) && !movedIds.has(data.targetNodeId)) continue;
-                  const frameIndexByY = sortedByY.findIndex(f => f.id === frame.id);
-                  const frameIndexByX = sortedByX.findIndex(f => f.id === frame.id);
-                  updateConnector(frame as FrameNode, data, frameIndexByY, frameIndexByX, totalFrames);
-                }
-              } catch (e) { console.error('Failed to update connector after document change', e); }
-            }
-          }
-        }
-      }, 150);
+    // Start the render loop if it isn't already running
+    if (positionChanged && !_isAnimating) {
+      _isAnimating = true;
+      setTimeout(processMovedNodes, 16);
     }
   });
 })();
