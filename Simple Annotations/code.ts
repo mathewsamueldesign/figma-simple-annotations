@@ -163,6 +163,8 @@ emitState();
   // This avoids running O(N) async work on every animation frame of a drag.
   let _positionUpdateTimer: ReturnType<typeof setTimeout> | null = null;
   let _pendingPositionUpdate = false;
+  // Track which node IDs actually moved so we only redraw affected connectors.
+  const _movedNodeIds = new Set<string>();
 
   // eslint-disable-next-line @figma/figma-plugins/dynamic-page-documentchange-event-advice
   figma.on('documentchange', (event) => {
@@ -173,6 +175,7 @@ emitState();
         // Flag position/size changes for the debounced connector update
         if (p.indexOf('x') !== -1 || p.indexOf('y') !== -1 || p.indexOf('width') !== -1 || p.indexOf('height') !== -1) {
           _pendingPositionUpdate = true;
+          _movedNodeIds.add(change.node.id);
         }
 
         // Handle Manual Text Edits mapping back to Plugin Data — runs immediately (no debounce)
@@ -243,6 +246,8 @@ emitState();
       _positionUpdateTimer = setTimeout(() => {
         _pendingPositionUpdate = false;
         _positionUpdateTimer = null;
+        const movedIds = new Set(_movedNodeIds);
+        _movedNodeIds.clear();
 
         const annotationFrames = figma.currentPage.findAllWithCriteria({ pluginData: { keys: ['annotationData'] } });
         const totalFrames = annotationFrames.length;
@@ -259,6 +264,9 @@ emitState();
               try {
                 const data = JSON.parse(dataStr);
                 if (data.targetNodeId) {
+                  // Only redraw if this annotation frame or its target actually moved.
+                  // This avoids updating all N connectors when only 1 element was dragged.
+                  if (!movedIds.has(frame.id) && !movedIds.has(data.targetNodeId)) continue;
                   const frameIndexByY = sortedByY.findIndex(f => f.id === frame.id);
                   const frameIndexByX = sortedByX.findIndex(f => f.id === frame.id);
                   updateConnector(frame as FrameNode, data, frameIndexByY, frameIndexByX, totalFrames);
@@ -427,11 +435,19 @@ async function updateConnector(
     }
     if (line.x !== minX) line.x = minX;
     if (line.y !== minY) line.y = minY;
-    line.strokeWeight = 2;
-    line.dashPattern = [4, 4];
-    line.cornerRadius = 8;
-    line.strokes = [{ type: 'SOLID', color: hexToRgb(data.connectorColor) }];
-    line.fills = [];
+    // Guard static style writes — only mutate if the value has actually changed
+    // to avoid triggering unnecessary Figma re-renders on every connector update.
+    if (line.strokeWeight !== 2) line.strokeWeight = 2;
+    if (line.dashPattern[0] !== 4 || line.dashPattern[1] !== 4) line.dashPattern = [4, 4];
+    if ((line.cornerRadius as number) !== 8) line.cornerRadius = 8;
+    const expectedLineColor = hexToRgb(data.connectorColor);
+    const currentLineStroke = line.strokes[0] as SolidPaint | undefined;
+    if (!currentLineStroke || currentLineStroke.color.r !== expectedLineColor.r ||
+      currentLineStroke.color.g !== expectedLineColor.g ||
+      currentLineStroke.color.b !== expectedLineColor.b) {
+      line.strokes = [{ type: 'SOLID', color: expectedLineColor }];
+    }
+    if ((line.fills as readonly Paint[]).length !== 0) line.fills = [];
 
     if (!dot || dot.type !== 'ELLIPSE') {
       dot = figma.createEllipse();
@@ -447,13 +463,20 @@ async function updateConnector(
 
     if (dot.x !== dotX) dot.x = dotX;
     if (dot.y !== dotY) dot.y = dotY;
-    dot.fills = [{ type: 'SOLID', color: hexToRgb(data.connectorColor) }];
-    dot.strokes = [];
-    dot.strokeWeight = 0;
+    const expectedDotColor = hexToRgb(data.connectorColor);
+    const currentDotFill = (dot.fills as readonly Paint[])[0] as SolidPaint | undefined;
+    if (!currentDotFill || currentDotFill.color.r !== expectedDotColor.r ||
+      currentDotFill.color.g !== expectedDotColor.g ||
+      currentDotFill.color.b !== expectedDotColor.b) {
+      dot.fills = [{ type: 'SOLID', color: expectedDotColor }];
+    }
+    if (dot.strokes.length !== 0) dot.strokes = [];
+    if (dot.strokeWeight !== 0) dot.strokeWeight = 0;
 
-    // Send lines to the back of the frame, behind the actual annotation rows
-    if (line.parent === frame) frame.insertChild(0, line);
-    if (dot.parent === frame) frame.insertChild(1, dot);
+    // Send lines to the back of the frame, behind the actual annotation rows.
+    // Guard with index check to avoid unnecessary child-order mutations.
+    if (line.parent === frame && frame.children.indexOf(line) !== 0) frame.insertChild(0, line);
+    if (dot.parent === frame && frame.children.indexOf(dot) !== 1) frame.insertChild(1, dot);
 
   } catch (err) {
     figma.notify("Connector Drawing Error: " + (err as Error).message);
