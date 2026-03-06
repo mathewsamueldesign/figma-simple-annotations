@@ -28,10 +28,16 @@ A Figma plugin for attaching clean, structured annotation notes directly to elem
 
 ### Tips
 
-- The connector line updates automatically when you move either the annotation or the target element
+- The connector line updates automatically when you move either the annotation or the target element — it snaps into position shortly after you stop dragging
 - You can add multiple Notes per annotation using the **+ Add Note** button
 - Labels you've used before will appear in the dropdown as you type — click to apply them quickly
 - Keep the plugin window open while moving annotations around the canvas for the connector to stay in sync
+
+---
+
+## Performance
+
+Connector lines are redrawn using a debounced update that fires ~150 ms after you stop moving, rather than on every animation frame. This keeps the plugin CPU-efficient on files with many annotations while still giving a responsive feel.
 
 ---
 
