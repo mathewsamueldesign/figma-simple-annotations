@@ -557,11 +557,22 @@
     input:checked+.slider:before {
       transform: translateX(20px);
     }
+
+    .version-number {
+      font-size: 10px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
   </style>
 </head>
 
 <body>
   <div class="header" style="padding-bottom: 4px;">
+    <div style="display: flex; justify-content: flex-end;">
+      <div class="version-number" id="plugin-version">v1.0.1</div>
+    </div>
     <div class="info-banner" style="margin-bottom: 12px;">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
         style="flex-shrink: 0;">
